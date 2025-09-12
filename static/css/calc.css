@@ -1,3 +1,0 @@
-.calc{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
-@media(max-width:720px){.calc{grid-template-columns:1fr}}
-.calc input,.calc select{width:100%}
