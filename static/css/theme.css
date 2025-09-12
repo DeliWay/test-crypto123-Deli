@@ -1,0 +1,8 @@
+:root[data-theme="dark"]{--bg:#0b0f13;--text:#e3e6eb;--panel:#121821;}
+:root[data-theme="light"]{--bg:#f7f9fc;--text:#1a1f29;--panel:#ffffff;}
+body{background:var(--bg);color:var(--text);}
+.card{background:var(--panel);border-radius:12px;padding:12px;box-shadow:0 4px 12px rgba(0,0,0,.2);}
+.tabular{font-variant-numeric:tabular-nums;}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.grid{display:grid;grid-template-columns:2fr 1fr;gap:12px;}
+@media(max-width:720px){.grid{grid-template-columns:1fr;}}

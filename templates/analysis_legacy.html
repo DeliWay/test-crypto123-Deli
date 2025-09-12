@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Анализ криптовалюты - CryptoAnalyst Pro</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tradingview.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/inline-styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+
+</head>
+
+{%include '_lang_header.html'%}
+
+    <div class="container">
+        <header class="crypto-header">
+            <div class="header-content">
+                <div class="logo-container">
+                    <a href="/" class="logo-link">
+                        <div class="logo">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="logo-text">
+                            <h1 class="logo-title">CryptoAnalyst Pro</h1>
+                            <div class="logo-subtitle">Technical Analysis</div>
+                        </div>
+                    </a>
+                </div>
+
+                <div class="header-nav">
+                    <a href="/" class="nav-item">
+                        <div class="nav-icon">
+                            <i class="fas fa-home"></i>
+                        </div>
+                        <span class="nav-text">Главная</span>
+                    </a>
+
+                    <a href="/patterns" class="nav-item">
+                        <div class="nav-icon">
+                            <i class="fas fa-book"></i>
+                        </div>
+                        <span class="nav-text">Паттерны</span>
+                    </a>
+
+                    <div class="nav-item" id="theme-toggle">
+                        <div class="nav-icon">
+                            <i class="fas fa-moon"></i>
+                        </div>
+                        <span class="nav-text">Тема</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <!-- Page Header -->
+            <div class="page-header">
+                <div class="header-content">
+                    <h2 id="symbol-header">Анализ криптовалюты</h2>
+                    <div class="header-actions">
+                        <span class="update-time" id="update-time">
+                            <i class="fas fa-clock"></i> Обновлено: <span id="update-timestamp">Загрузка...</span>
+                        </span>
+                        <button class="btn btn-primary" id="refresh-analysis">
+                            <i class="fas fa-sync-alt"></i> Обновить
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Price Header -->
+            <section class="price-header">
+                <div class="price-info">
+                    <h3 id="current-symbol">Загрузка...</h3>
+                    <div class="price-large" id="current-price">$0.00</div>
+                    <div class="price-change" id="price-change">
+                        <i class="fas fa-arrow-up"></i> 0.00%
+                    </div>
+                </div>
+            </section>
+
+            <!-- TradingView Chart -->
+            <section class="chart-section">
+                <div class="tradingview-widget-container">
+                    <div id="tradingview-chart"></div>
+                    <div class="tradingview-widget-copyright">
+                        <a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank">
+                            <span class="blue-text">Track все рынки на TradingView</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Timeframe Controls -->
+                <div class="timeframe-controls">
+                    <h4><i class="fas fa-chart-line"></i> Таймфрейм анализа</h4>
+                    <div class="timeframe-buttons">
+                        <button class="btn" data-tf="1">1M</button>
+                        <button class="btn" data-tf="5">5M</button>
+                        <button class="btn" data-tf="15">15M</button>
+                        <button class="btn" data-tf="30">30M</button>
+                        <button class="btn active" data-tf="60">1H</button>
+                        <button class="btn" data-tf="240">4H</button>
+                        <button class="btn" data-tf="D">1D</button>
+                        <button class="btn" data-tf="W">1W</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Auto Refresh Section -->
+            <section class="auto-refresh-section">
+                <div class="refresh-controls">
+                    <h4><i class="fas fa-sync-alt"></i> Автообновление данных</h4>
+                    <div class="refresh-status">
+                        <span class="live-indicator"></span>
+                        <span>Следующее обновление через: <span id="countdown">15</span> сек</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <button class="refresh-btn" id="toggle-refresh">
+                        <i class="fas fa-pause"></i> Приостановить автообновление
+                    </button>
+                </div>
+            </section>
+
+            <!-- Analysis Results -->
+            <section class="analysis-results">
+                <h3><i class="fas fa-chart-bar"></i> Результаты анализа</h3>
+
+                <div class="analysis-grid">
+                    <!-- Recommendation Card -->
+                    <div class="analysis-card">
+                        <div class="card-header">
+                            <h4>Торговая рекомендация</h4>
+                            <span class="live-indicator"></span>
+                        </div>
+                        <div class="recommendation" id="recommendation">
+                            <div class="loading-state">
+                                <div class="loading-spinner"></div>
+                                <p>Анализируем данные...</p>
+                            </div>
+                        </div>
+                        <div class="confidence-score">
+                            <div class="score-label">Уверенность анализа:</div>
+                            <div class="score-bar">
+                                <div class="score-fill" id="confidence-fill"></div>
+                            </div>
+                            <span class="score-value" id="confidence-value">0%</span>
+                        </div>
+                    </div>
+
+                    <!-- Trend Analysis -->
+                    <div class="analysis-card">
+                        <div class="card-header">
+                            <h4>Анализ тренда</h4>
+                            <i class="fas fa-wave-square"></i>
+                        </div>
+                        <div class="analysis-content" id="trend-analysis">
+                            <div class="loading-state">
+                                <div class="loading-spinner"></div>
+                                <p>Загрузка...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Momentum Analysis -->
+                    <div class="analysis-card">
+                        <div class="card-header">
+                            <h4>Моментум индикаторы</h4>
+                            <i class="fas fa-tachometer-alt"></i>
+                        </div>
+                        <div class="analysis-content" id="momentum-analysis">
+                            <div class="loading-state">
+                                <div class="loading-spinner"></div>
+                                <p>Загрузка...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Volume Analysis -->
+                    <div class="analysis-card">
+                        <div class="card-header">
+                            <h4>Анализ объема</h4>
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                        <div class="analysis-content" id="volume-analysis">
+                            <div class="loading-state">
+                                <div class="loading-spinner"></div>
+                                <p>Загрузка...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Technical Indicators -->
+            <section class="indicators-section">
+                <h3><i class="fas fa-sliders-h"></i> Технические индикаторы</h3>
+
+                <div class="indicators-grid">
+                    <div class="indicator-card">
+                        <h4>RSI (14 периодов)</h4>
+                        <div class="indicator-value" id="rsi-value">-</div>
+                        <div class="indicator-bar">
+                            <div class="indicator-fill" id="rsi-bar"></div>
+                        </div>
+                        <div class="indicator-signal" id="rsi-signal">-</div>
+                    </div>
+
+                    <div class="indicator-card">
+                        <h4>MACD</h4>
+                        <div class="indicator-value" id="macd-value">-</div>
+                        <div class="indicator-signal" id="macd-signal">-</div>
+                        <div class="indicator-hint" id="macd-hint">-</div>
+                    </div>
+
+                    <div class="indicator-card">
+                        <h4>Bollinger Bands</h4>
+                        <div class="indicator-value" id="bb-value">-</div>
+                        <div class="indicator-signal" id="bb-signal">-</div>
+                        <div class="indicator-hint" id="bb-hint">-</div>
+                    </div>
+
+                    <div class="indicator-card">
+                        <h4>Стохастик</h4>
+                        <div class="indicator-value" id="stoch-value">-</div>
+                        <div class="indicator-signal" id="stoch-signal">-</div>
+                        <div class="indicator-hint" id="stoch-hint">-</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Pattern Detection -->
+            <section class="patterns-section">
+                <h3><i class="fas fa-shapes"></i> Обнаруженные паттерны</h3>
+
+                <div class="patterns-grid" id="patterns-container">
+                    <div class="loading-state">
+                        <div class="loading-spinner"></div>
+                        <p>Поиск графических паттернов...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Profit Potential -->
+            <section class="profit-section">
+                <h3><i class="fas fa-chart-line"></i> Потенциал прибыли</h3>
+
+                <div class="profit-card">
+                    <div class="profit-header">
+                        <div class="profit-value" id="profit-value">0%</div>
+                        <div class="profit-confidence" id="profit-confidence">Низкая уверенность</div>
+                    </div>
+
+                    <div class="profit-breakdown">
+                        <div class="profit-item">
+                            <span>Риск-профит соотношение:</span>
+                            <span id="risk-reward">1:0</span>
+                        </div>
+                        <div class="profit-item">
+                            <span>Рекомендуемый стоп-лосс:</span>
+                            <span id="stop-loss">-</span>
+                        </div>
+                        <div class="profit-item">
+                            <span>Потенциальная цель:</span>
+                            <span id="take-profit">-</span>
+                        </div>
+                        <div class="profit-item">
+                            <span>Волатильность рынка:</span>
+                            <span id="volatility">-</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Multi-Timeframe Analysis -->
+            <section class="multi-timeframe-section">
+                <h3><i class="fas fa-layer-group"></i> Анализ по таймфреймам</h3>
+
+                <div class="timeframe-cards">
+                    <div class="timeframe-card">
+                        <h4>1H</h4>
+                        <div class="tf-signal" id="tf-1h">-</div>
+                        <div class="tf-confidence" id="tf-1h-conf">-</div>
+                    </div>
+
+                    <div class="timeframe-card">
+                        <h4>4H</h4>
+                        <div class="tf-signal" id="tf-4h">-</div>
+                        <div class="tf-confidence" id="tf-4h-conf">-</div>
+                    </div>
+
+                    <div class="timeframe-card">
+                        <h4>1D</h4>
+                        <div class="tf-signal" id="tf-1d">-</div>
+                        <div class="tf-confidence" id="tf-1d-conf">-</div>
+                    </div>
+
+                    <div class="timeframe-card">
+                        <h4>1W</h4>
+                        <div class="tf-signal" id="tf-1w">-</div>
+                        <div class="tf-confidence" id="tf-1w-conf">-</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Risk Calculator -->
+            <section class="risk-calculator-section">
+                <h3><i class="fas fa-calculator"></i> Калькулятор риска</h3>
+
+                <div class="calculator-grid">
+                    <div class="calculator-card">
+                        <h4>Размер позиции</h4>
+                        <div class="calculator-form">
+                            <label>Размер депозита ($):</label>
+                            <input type="number" id="deposit-size" value="1000" min="10" step="10">
+
+                            <label>Риск на сделку (%):</label>
+                            <input type="range" id="risk-percent" min="0.5" max="5" step="0.5" value="2">
+                            <span id="risk-value">2%</span>
+
+                            <div class="calculator-result">
+                                <strong>Размер позиции: <span id="position-size">$0</span></strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="calculator-card">
+                        <h4>Управление капиталом</h4>
+                        <div class="management-stats">
+                            <div class="management-item">
+                                <span>Максимальный убыток:</span>
+                                <span id="max-loss">$0</span>
+                            </div>
+                            <div class="management-item">
+                                <span>Потенциальная прибыль:</span>
+                                <span id="potential-profit">$0</span>
+                            </div>
+                            <div class="management-item">
+                                <span>Соотношение R/R:</span>
+                                <span id="rr-ratio">1:0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Additional Data -->
+            <section class="additional-data-section">
+                <h3><i class="fas fa-database"></i> Дополнительные данные</h3>
+
+                <div class="data-grid">
+    <div class="data-card">
+        <h4>Исторические данные</h4>
+        <div class="price-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Период</th>
+                        <th>Цена</th>
+                        <th>Изменение</th>
+                    </tr>
+                </thead>
+                <tbody id="history-data">
+                    <tr><td colspan="3">Загрузка данных...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="data-card">
+        <h4>Статистика рынка</h4>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <span>Объем (24ч):</span>
+                <span id="volume-24h">-</span>
+            </div>
+            <div class="stat-item">
+                <span>Макс. цена (24ч):</span>
+                <span id="high-24h">-</span>
+            </div>
+            <div class="stat-item">
+                <span>Мин. цена (24ч):</span>
+                <span id="low-24h">-</span>
+            </div>
+            <div class="stat-item">
+                <span>Изменение (24ч):</span>
+                <span id="change-24h">-</span>
+            </div>
+        </div>
+    </div>
+</div>
+            </section>
+        </main>
+
+        <footer class="main-footer">
+            <div class="footer-content">
+                <p>&copy; 2025 CryptoAnalyst Pro | Профессиональная аналитическая платформа</p>
+                <p class="disclaimer">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Для образовательных целей. Торгуйте осторожно, криптовалюты - высокорисковые активы.
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- TradingView Widget -->
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+    <!-- TradingView Widget -->
+    <!-- DUP REMOVED: tv.js -->
+
+    <!-- Подключаем JS файлы -->
+    <script src="{{ url_for('static', filename='js/tradingview-loader.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/analysis-core.js') }}"></script>
+
+    <script >
+        // Минимальный inline скрипт для инициализации
+        document.addEventListener('DOMContentLoaded', function() {
+            // Базовая инициализация темы
+            const savedTheme = localStorage.getItem('cryptoanalyst_theme');
+            const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            const theme = savedTheme || systemTheme;
+
+            document.documentElement.setAttribute('data-theme', theme);
+
+            // Обновление иконки темы
+            const themeIcon = document.querySelector('#theme-toggle i');
+            if (themeIcon) {
+                themeIcon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+            }
+
+            // Инициализация основного приложения
+            if (typeof AnalysisCore !== 'undefined') {
+                AnalysisCore.init();
+            }
+        });
+    </script>
+
+    <script>
+        // ===== КОНФИГУРАЦИЯ ПРИЛОЖЕНИЯ =====
+        const AppConfig = {
+            refreshInterval: 15000,
+            apiTimeout: 10000,
+            themeKey: 'cryptoanalyst_theme'
+        };
+
+        // ===== ГЛОБАЛЬНОЕ СОСТОЯНИЕ =====
+        let AppState = {
+            currentSymbol: '',
+            currentTimeframe: '60',
+            currentTheme: 'dark',
+            autoRefresh: true,
+            refreshTimer: null,
+            countdown: 15,
+            tradingViewWidget: null,
+            currentData: null
+        };
+
+        // ===== УПРАВЛЕНИЕ ТЕМОЙ =====
+        class ThemeManager {
+            static init() {
+                this.loadTheme();
+                this.setupEventListeners();
+            }
+
+            static loadTheme() {
+                const savedTheme = localStorage.getItem(AppConfig.themeKey);
+                const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                AppState.currentTheme = savedTheme || systemTheme;
+
+                document.documentElement.setAttribute('data-theme', AppState.currentTheme);
+                this.updateThemeIcon();
+            }
+
+            static toggleTheme() {
+                AppState.currentTheme = AppState.currentTheme === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', AppState.currentTheme);
+                localStorage.setItem(AppConfig.themeKey, AppState.currentTheme);
+
+                this.updateThemeIcon();
+            }
+
+            static updateThemeIcon() {
+                const themeIcon = document.querySelector('#theme-toggle i');
+                if (themeIcon) {
+                    themeIcon.className = AppState.currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+                }
+            }
+
+            static setupEventListeners() {
+                const themeToggle = document.getElementById('theme-toggle');
+                if (themeToggle) {
+                    themeToggle.addEventListener('click', () => this.toggleTheme());
+                }
+            }
+        }
+
+        // ===== УПРАВЛЕНИЕ ДАННЫМИ =====
+        class DataManager {
+            static async loadAnalysisData(symbol, timeframe) {
+                try {
+                    UI.showLoadingState();
+
+                    // Имитация загрузки данных с сервера
+                    // В реальном приложении здесь должен быть fetch к вашему API
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+
+                    // Генерация демонстрационных данных
+                    const demoData = this.generateDemoData(symbol, timeframe);
+
+                    AppState.currentData = demoData;
+                    return demoData;
+                } catch (error) {
+                    console.error('Ошибка загрузки данных анализа:', error);
+                    UI.showError(`Ошибка загрузки данных: ${error.message}`);
+                    throw error;
+                }
+            }
+
+            static generateDemoData(symbol, timeframe) {
+                // Генерация случайных данных для демонстрации
+                const price = 45000 + Math.random() * 5000;
+                const change = (Math.random() * 10 - 5);
+                const score = 30 + Math.random() * 60;
+
+                let recommendation, confidence;
+                if (score > 70) {
+                    recommendation = "ПОКУПАТЬ";
+                    confidence = "Высокая";
+                } else if (score < 40) {
+                    recommendation = "ПРОДАВАТЬ";
+                    confidence = "Средняя";
+                } else {
+                    recommendation = "НЕЙТРАЛЬНО";
+                    confidence = "Низкая";
+                }
+
+                return {
+                    success: true,
+                    symbol: symbol,
+                    timeframe: timeframe,
+                    analysis: {
+                        price: price,
+                        price_change: change,
+                        recommendation: recommendation,
+                        score: score,
+                        confidence: confidence,
+                        technical_indicators: {
+                            rsi: (30 + Math.random() * 40).toFixed(2),
+                            macd: {
+                                value: (Math.random() * 0.1 - 0.05).toFixed(6),
+                                signal: Math.random() > 0.5 ? "Бычий" : "Медвежий"
+                            },
+                            bollinger_bands: {
+                                position: Math.random() > 0.5 ? "Верхняя половина" : "Нижняя половина"
+                            }
+                        }
+                    },
+                    patterns: [
+                        {
+                            name: "Двойное дно",
+                            type: "Разворотный",
+                            confidence: "Высокая",
+                            description: "Два минимума на одном уровне поддержки",
+                            easter_egg: "Объем обычно увеличивается на втором дне"
+                        },
+                        {
+                            name: "Бычье поглощение",
+                            type: "Разворотный",
+                            confidence: "Средняя",
+                            description: "Бычья свеча полностью поглощает медвежью",
+                            easter_egg: "Сильный разворотный сигнал при объеме"
+                        }
+                    ],
+                    profit_potential: {
+                        potential_profit: (5 + Math.random() * 10).toFixed(1) + "%",
+                        confidence: confidence,
+                        risk_reward_ratio: "1:" + (2 + Math.random() * 2).toFixed(1),
+                        stop_loss: (price * 0.97).toFixed(2),
+                        take_profit: (price * 1.05).toFixed(2),
+                        volatility_based: (30 + Math.random() * 40).toFixed(1) + "%"
+                    },
+                    timestamp: new Date().toISOString()
+                };
+            }
+        }
+
+        // ===== ОТОБРАЖЕНИЕ ИНТЕРФЕЙСА =====
+        class UI {
+            static init() {
+                this.parseUrlParams();
+                this.setupEventListeners();
+                this.initTradingView();
+                this.startAutoRefresh();
+                this.refreshData();
+            }
+
+            static parseUrlParams() {
+                const urlParams = new URLSearchParams(window.location.search);
+                AppState.currentSymbol = urlParams.get('symbol') || 'BTCUSDT';
+                AppState.currentTimeframe = urlParams.get('timeframe') || '60';
+
+                document.getElementById('symbol-header').textContent = `Анализ ${AppState.currentSymbol}`;
+                document.getElementById('current-symbol').textContent = AppState.currentSymbol;
+            }
+
+            static setupEventListeners() {
+                // Кнопка обновления
+                document.getElementById('refresh-analysis').addEventListener('click', () => {
+                    this.refreshData();
+                });
+
+                // Переключение автообновления
+                document.getElementById('toggle-refresh').addEventListener('click', () => {
+                    AppState.autoRefresh = !AppState.autoRefresh;
+                    this.toggleAutoRefresh();
+                });
+
+                // Кнопки таймфреймов
+                document.querySelectorAll('.timeframe-buttons .btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.timeframe-buttons .btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+
+                        AppState.currentTimeframe = btn.dataset.tf;
+                        this.refreshData();
+                    });
+                });
+
+                // Калькулятор риска
+                const riskSlider = document.getElementById('risk-percent');
+                const riskValue = document.getElementById('risk-value');
+                const depositInput = document.getElementById('deposit-size');
+
+                riskSlider.addEventListener('input', () => {
+                    riskValue.textContent = `${riskSlider.value}%`;
+                    this.updateRiskCalculator();
+                });
+
+                depositInput.addEventListener('input', () => {
+                    this.updateRiskCalculator();
+                });
+            }
+
+            static async refreshData() {
+                try {
+                    UI.showLoadingState();
+                    const data = await DataManager.loadAnalysisData(AppState.currentSymbol, AppState.currentTimeframe);
+                    this.updateUI(data);
+                } catch (error) {
+                    console.error('Ошибка обновления данных:', error);
+                }
+            }
+
+            static updateUI(data) {
+                if (!data) return;
+
+                // Обновление цены
+                this.updatePriceData(data);
+
+                // Обновление рекомендации
+                this.updateRecommendation(data.analysis);
+
+                // Обновление индикаторов
+                this.updateIndicators(data.analysis);
+
+                // Обновление паттернов
+                this.updatePatterns(data.patterns);
+
+                // Обновление потенциала прибыли
+                this.updateProfitPotential(data.profit_potential);
+
+                // Обновление времени
+                document.getElementById('update-timestamp').textContent = new Date().toLocaleTimeString();
+            }
+
+            static updatePriceData(data) {
+                const price = data.analysis?.price || 0;
+                const change = data.analysis?.price_change || 0;
+
+                document.getElementById('current-price').textContent = `$${this.formatPrice(price)}`;
+
+                const priceChangeElement = document.getElementById('price-change');
+                priceChangeElement.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+                priceChangeElement.className = `price-change ${change >= 0 ? 'positive' : 'negative'}`;
+
+                const changeIcon = priceChangeElement.querySelector('i');
+                changeIcon.className = change >= 0 ? 'fas fa-arrow-up' : 'fas fa-arrow-down';
+            }
+
+            static updateRecommendation(analysis) {
+                const recommendationElement = document.getElementById('recommendation');
+                const confidenceElement = document.getElementById('confidence-value');
+                const confidenceFill = document.getElementById('confidence-fill');
+
+                if (!analysis) {
+                    recommendationElement.innerHTML = `
+                        <div class="error-state">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <p>Данные недоступны</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const recommendation = analysis.recommendation || 'НЕЙТРАЛЬНО';
+                const score = analysis.score || 50;
+                const confidence = analysis.confidence || 'Низкая';
+
+                recommendationElement.innerHTML = `
+                    <div class="recommendation ${recommendation.toLowerCase()}">
+                        ${recommendation}
+                    </div>
+                    <div class="recommendation-explanation">
+                        ${this.getRecommendationExplanation(recommendation, analysis)}
+                    </div>
+                `;
+
+                confidenceElement.textContent = `${score}%`;
+                confidenceFill.style.width = `${score}%`;
+                confidenceFill.style.background = this.getConfidenceColor(score);
+            }
+
+            static updateIndicators(analysis) {
+                if (!analysis || !analysis.technical_indicators) return;
+
+                const indicators = analysis.technical_indicators;
+
+                // RSI
+                if (indicators.rsi) {
+                    document.getElementById('rsi-value').textContent = indicators.rsi;
+                    document.getElementById('rsi-bar').style.width = `${indicators.rsi}%`;
+                    document.getElementById('rsi-bar').style.background = this.getRsiColor(indicators.rsi);
+                    document.getElementById('rsi-signal').textContent = this.getRsiSignal(indicators.rsi);
+                }
+
+                // MACD
+                if (indicators.macd) {
+                    const macdValue = indicators.macd.value || 0;
+                    const macdSignal = indicators.macd.signal || '';
+
+                    document.getElementById('macd-value').textContent = macdValue.toFixed(6);
+                    document.getElementById('macd-signal').textContent = macdSignal;
+                    document.getElementById('macd-hint').textContent = this.getMacdHint(macdValue, macdSignal);
+                }
+
+                // Bollinger Bands
+                if (indicators.bollinger_bands) {
+                    const position = indicators.bollinger_bands.position || 'Нейтральный';
+
+                    document.getElementById('bb-value').textContent = position;
+                    document.getElementById('bb-signal').textContent = this.getBollingerSignal(position);
+                    document.getElementById('bb-hint').textContent = this.getBollingerHint(position);
+                }
+            }
+
+            static updatePatterns(patterns) {
+                const container = document.getElementById('patterns-container');
+
+                if (!patterns || patterns.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-search"></i>
+                            <p>Паттерны не обнаружены</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = patterns.map(pattern => `
+                    <div class="pattern-card">
+                        <div class="pattern-header">
+                            <h4>${pattern.name}</h4>
+                            <span class="confidence-badge ${pattern.confidence.toLowerCase()}">
+                                ${pattern.confidence}
+                            </span>
+                        </div>
+                        <div class="pattern-type">Тип: ${pattern.type}</div>
+                        <p class="pattern-description">${pattern.description}</p>
+                        <div class="pattern-hint">${pattern.easter_egg}</div>
+                    </div>
+                `).join('');
+            }
+
+            static updateProfitPotential(profitData) {
+                if (!profitData) return;
+
+                document.getElementById('profit-value').textContent = profitData.potential_profit || '0%';
+                document.getElementById('profit-confidence').textContent = profitData.confidence || 'Низкая';
+                document.getElementById('risk-reward').textContent = profitData.risk_reward_ratio || '1:0';
+                document.getElementById('stop-loss').textContent = profitData.stop_loss || '-';
+                document.getElementById('take-profit').textContent = profitData.take_profit || '-';
+                document.getElementById('volatility').textContent = profitData.volatility_based || '-';
+            }
+
+            static initTradingView() {
+                if (typeof TradingView === 'undefined') {
+                    console.error('TradingView widget not loaded');
+                    return;
+                }
+
+                AppState.tradingViewWidget = new TradingView.widget({
+                    symbol: `BINANCE:${AppState.currentSymbol}`,
+                    interval: AppState.currentTimeframe,
+                    container_id: "tradingview-chart",
+                    locale: "ru",
+                    autosize: true,
+                    theme: AppState.currentTheme,
+                    style: "1",
+                    toolbar_bg: "#f1f3f6",
+                    enable_publishing: false,
+                    hide_top_toolbar: false,
+                    hide_legend: false,
+                    save_image: false,
+                    studies: [
+                        "RSI@tv-basicstudies",
+                        "MACD@tv-basicstudies",
+                        "StochasticRSI@tv-basicstudies",
+                        "BB@tv-basicstudies"
+                    ],
+                    drawings_access: {
+                        type: 'black',
+                        tools: [
+                            { name: "Regression Trend" },
+                            { name: "Trend Angle" },
+                            { name: "Trend Line" },
+                            { name: "Horizontal Line" },
+                            { name: "Vertical Line" },
+                            { name: "Line" },
+                            { name: "Arrow" }
+                        ]
+                    }
+                });
+            }
+
+            static startAutoRefresh() {
+                if (AppState.refreshTimer) {
+                    clearInterval(AppState.refreshTimer);
+                }
+
+                AppState.refreshTimer = setInterval(() => {
+                    if (AppState.autoRefresh) {
+                        if (AppState.countdown > 0) {
+                            AppState.countdown--;
+                            document.getElementById('countdown').textContent = AppState.countdown;
+                            document.getElementById('progress-fill').style.width =
+                                `${(100 - (AppState.countdown / 15 * 100))}%`;
+                        } else {
+                            AppState.countdown = 15;
+                            this.refreshData();
+                        }
+                    }
+                }, 1000);
+            }
+
+            static toggleAutoRefresh() {
+                const toggleBtn = document.getElementById('toggle-refresh');
+                const icon = toggleBtn.querySelector('i');
+
+                if (AppState.autoRefresh) {
+                    toggleBtn.innerHTML = '<i class="fas fa-play"></i> Возобновить автообновление';
+                    toggleBtn.style.background = 'var(--accent-success)';
+                } else {
+                    toggleBtn.innerHTML = '<i class="fas fa-pause"></i> Приостановить автообновление';
+                    toggleBtn.style.background = 'var(--accent-warning)';
+                }
+            }
+
+            static showLoadingState() {
+                document.querySelectorAll('.analysis-content, #recommendation, #patterns-container')
+                    .forEach(el => {
+                        el.innerHTML = `
+                            <div class="loading-state">
+                                <div class="loading-spinner"></div>
+                                <p>Загрузка данных...</p>
+                            </div>
+                        `;
+                    });
+            }
+
+            static showError(message) {
+                const recommendationElement = document.getElementById('recommendation');
+                recommendationElement.innerHTML = `
+                    <div class="error-state">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>${message}</p>
+                        <button class="btn btn-primary" onclick="UI.refreshData()">
+                            <i class="fas fa-sync-alt"></i> Попробовать снова
+                        </button>
+                    </div>
+                `;
+            }
+
+            static formatPrice(price) {
+                if (price >= 1000) return price.toFixed(0);
+                if (price >= 1) return price.toFixed(2);
+                if (price >= 0.01) return price.toFixed(4);
+                return price.toFixed(6);
+            }
+
+            static getRecommendationExplanation(recommendation, analysis) {
+                const explanations = {
+                    'ПОКУПАТЬ': 'Сильные бычьи сигналы. Рекомендуется рассмотреть покупку.',
+                    'ПРОДАВАТЬ': 'Сильные медвежьи сигналы. Рекомендуется рассмотреть продажу.',
+                    'НЕЙТРАЛЬНО': 'Сигналы неоднозначны. Рекомендуется ожидание.'
+                };
+
+                return explanations[recommendation] || 'Анализ завершен.';
+            }
+
+            static getConfidenceColor(score) {
+                if (score >= 70) return 'var(--accent-success)';
+                if (score >= 50) return 'var(--accent-warning)';
+                return 'var(--accent-error)';
+            }
+
+            static getRsiColor(value) {
+                if (value > 70) return 'var(--accent-error)';
+                if (value < 30) return 'var(--accent-success)';
+                return 'var(--accent-warning)';
+            }
+
+            static getRsiSignal(value) {
+                if (value > 70) return 'Перекупленность';
+                if (value < 30) return 'Перепроданность';
+                return 'Нейтральный';
+            }
+
+            static getMacdHint(value, signal) {
+                if (value > 0 && signal === 'Бычий') return 'Сильный бычий сигнал';
+                if (value < 0 && signal === 'Медвежий') return 'Сильный медвежий сигнал';
+                return 'Сигнал неясен';
+            }
+
+            static getBollingerSignal(position) {
+                if (position.includes('Перекупленность')) return 'Медвежий';
+                if (position.includes('Перепроданность')) return 'Бычий';
+                return 'Нейтральный';
+            }
+
+            static getBollingerHint(position) {
+                if (position.includes('Перекупленность')) return 'Возможна коррекция вниз';
+                if (position.includes('Перепроданность')) return 'Возможен отскок вверх';
+                return 'Цена в нормальном диапазоне';
+            }
+
+            static updateRiskCalculator() {
+                const deposit = parseFloat(document.getElementById('deposit-size').value) || 1000;
+                const riskPercent = parseFloat(document.getElementById('risk-percent').value) || 2;
+                const riskAmount = deposit * (riskPercent / 100);
+
+                if (AppState.currentData && AppState.currentData.analysis) {
+                    const price = AppState.currentData.analysis.price;
+                    const stopLossPercent = 3; // Пример: 3% стоп-лосс
+                    const positionSize = riskAmount / (stopLossPercent / 100);
+
+                    document.getElementById('position-size').textContent = `$${positionSize.toFixed(2)}`;
+                    document.getElementById('max-loss').textContent = `$${riskAmount.toFixed(2)}`;
+
+                    // Пример расчета потенциальной прибыли
+                    const potentialGain = positionSize * 0.05; // 5% прибыль
+                    document.getElementById('potential-profit').textContent = `$${potentialGain.toFixed(2)}`;
+                    document.getElementById('rr-ratio').textContent = '1:1.67'; // Пример
+                }
+            }
+        }
+
+        // ===== ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ =====
+        document.addEventListener('DOMContentLoaded', () => {
+            ThemeManager.init();
+            UI.init();
+        });
+    </script>
+
+    <!-- В конец файла analysis.html, перед закрывающим тегом body -->
+    <!-- DUP REMOVED: tradingview-loader.js -->
+    <!-- DUP REMOVED: analysis-core.js -->
+    <script >
+        // Инициализация темы
+        document.addEventListener('DOMContentLoaded', function() {
+            // Загрузка темы
+            const savedTheme = localStorage.getItem('cryptoanalyst_theme');
+            const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            const theme = savedTheme || systemTheme;
+
+            document.documentElement.setAttribute('data-theme', theme);
+
+            // Обновление иконки темы
+            const themeIcon = document.querySelector('#theme-toggle i');
+            if (themeIcon) {
+                themeIcon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+            }
+
+            // Обработчик переключения темы
+            const themeToggle = document.getElementById('theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    const currentTheme = document.documentElement.getAttribute('data-theme');
+                    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+                    document.documentElement.setAttribute('data-theme', newTheme);
+                    localStorage.setItem('cryptoanalyst_theme', newTheme);
+
+                    const themeIcon = document.querySelector('#theme-toggle i');
+                    if (themeIcon) {
+                        themeIcon.className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+                    }
+
+                    // Обновление TradingView при изменении темы
+                    if (AnalysisCore.state.tradingViewWidget) {
+                        try {
+                            AnalysisCore.state.tradingViewWidget.changeTheme(newTheme);
+                        } catch (error) {
+                            console.warn('Ошибка обновления темы TradingView:', error);
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+<script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+\1
+</html>

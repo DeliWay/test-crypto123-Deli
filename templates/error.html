@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ошибка - CryptoAnalyst Pro</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+    <style>
+        .error-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-lg);
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+        }
+
+        .error-card {
+            background: var(--bg-card);
+            border-radius: var(--radius-xl);
+            padding: var(--space-xl);
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            max-width: 500px;
+            width: 100%;
+            animation: errorAppear 0.6s ease-out;
+        }
+
+        .error-icon {
+            font-size: 4rem;
+            color: var(--accent-error);
+            margin-bottom: var(--space-lg);
+            animation: pulse 2s infinite;
+        }
+
+        .error-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: var(--space-md);
+            background: linear-gradient(135deg, var(--accent-error) 0%, #dc2626 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .error-message {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-bottom: var(--space-xl);
+            line-height: 1.6;
+        }
+
+        .error-code {
+            background: var(--bg-tertiary);
+            padding: var(--space-sm);
+            border-radius: var(--radius-md);
+            font-family: 'Courier New', monospace;
+            color: var(--text-muted);
+            margin: var(--space-lg) 0;
+            font-size: 0.9rem;
+            word-break: break-all;
+        }
+
+        .error-actions {
+            display: flex;
+            gap: var(--space-md);
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: var(--space-xl);
+        }
+
+        .error-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-sm);
+            padding: var(--space-md) var(--space-lg);
+            border-radius: var(--radius-md);
+            text-decoration: none;
+            font-weight: 600;
+            transition: all var(--transition-normal);
+            min-width: 140px;
+            justify-content: center;
+        }
+
+        .error-btn-primary {
+            background: var(--gradient-primary);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .error-btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .error-btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .error-btn-secondary:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .error-details {
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-md);
+            padding: var(--space-md);
+            margin-top: var(--space-lg);
+            text-align: left;
+            display: none;
+        }
+
+        .error-details summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: var(--space-sm);
+        }
+
+        .error-details pre {
+            background: var(--bg-secondary);
+            padding: var(--space-md);
+            border-radius: var(--radius-sm);
+            overflow-x: auto;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            margin: 0;
+        }
+
+        .support-info {
+            margin-top: var(--space-xl);
+            padding-top: var(--space-md);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        @keyframes errorAppear {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        @media (max-width: 768px) {
+            .error-card {
+                padding: var(--space-lg);
+                margin: var(--space-md);
+            }
+
+            .error-title {
+                font-size: 1.5rem;
+            }
+
+            .error-actions {
+                flex-direction: column;
+            }
+
+            .error-btn {
+                width: 100%;
+            }
+        }
+
+        .error-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%);
+            opacity: 0.1;
+            z-index: -1;
+            pointer-events: none;
+        }
+    </style>
+</head>
+\1
+{%include '_lang_header.html'%}
+
+    <div class="error-background"></div>
+
+    <div class="error-container">
+        <div class="error-card">
+            <div class="error-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+
+            <h1 class="error-title">Произошла ошибка</h1>
+
+            <div class="error-message">
+                {%if message%}
+                    {{message}}
+                {%else%}
+                    При обработке вашего запроса произошла непредвиденная ошибка.
+                {%endif%}
+            </div>
+
+            {%if error%}
+            <div class="error-code">
+                <i class="fas fa-bug"></i>
+                Ошибка: {{error}}
+            </div>
+            {%endif%}
+
+            <div class="error-actions">
+                <a href="/" class="error-btn error-btn-primary">
+                    <i class="fas fa-home"></i>
+                    На главную
+                </a>
+
+                <a href="javascript:location.reload()" class="error-btn error-btn-secondary">
+                    <i class="fas fa-redo"></i>
+                    Попробовать снова
+                </a>
+
+                <button onclick="showErrorDetails()" class="error-btn error-btn-secondary">
+                    <i class="fas fa-code"></i>
+                    Подробности
+                </button>
+            </div>
+
+            <div class="error-details" id="errorDetails">
+                <summary>Техническая информация</summary>
+                <pre>{%if error%}{{error}}{%else%}Нет дополнительной информации{%endif%}</pre>
+            </div>
+
+            <div class="support-info">
+                <p>
+                    <i class="fas fa-life-ring"></i>
+                    Если ошибка повторяется, обратитесь в поддержку с кодом ошибки.
+                </p>
+                <p>
+                    <i class="fas fa-clock"></i>
+                    Время ошибки: {{now.strftime('%Y-%m-%d %H:%M:%S') if now else 'Неизвестно'}}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showErrorDetails() {
+            const details = document.getElementById('errorDetails');
+            details.style.display = details.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // Автоматическое скрытие через 30 секунд если пользователь не взаимодействует
+        let inactivityTimer = setTimeout(() => {
+            window.location.href = '/';
+        }, 30000);
+
+        // Сброс таймера при любом взаимодействии
+        document.addEventListener('mousemove', resetTimer);
+        document.addEventListener('keypress', resetTimer);
+        document.addEventListener('click', resetTimer);
+
+        function resetTimer() {
+            clearTimeout(inactivityTimer);
+            inactivityTimer = setTimeout(() => {
+                window.location.href = '/';
+            }, 30000);
+        }
+
+        // Попытка автоматического восстановления
+        setTimeout(() => {
+            if (navigator.onLine) {
+                const reloadBtn = document.querySelector('[onclick*="reload"]');
+                if (reloadBtn) {
+                    reloadBtn.innerHTML = '<i class="fas fa-bolt"></i> Автовосстановление...';
+                    setTimeout(() => location.reload(), 2000);
+                }
+            }
+        }, 5000);
+
+        // Отслеживание состояния сети
+        window.addEventListener('online', () => {
+            document.body.classList.add('online');
+            document.body.classList.remove('offline');
+        });
+
+        window.addEventListener('offline', () => {
+            document.body.classList.add('offline');
+            document.body.classList.remove('online');
+        });
+
+        // Инициализация темы
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('cryptoanalyst_theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        });
+    </script>
+<script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+\1
+</html>

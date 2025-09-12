@@ -1,0 +1,14 @@
+{
+  "title": "Крипто-панель",
+  "symbol": "Символ",
+  "interval": "Интервал",
+  "theme": "Тема",
+  "language": "Язык",
+  "ticker": "Тикер",
+  "calculator": "Калькулятор",
+  "signals": "Сигналы",
+  "export": "Экспорт CSV",
+  "home": "Главная",
+  "analysis": "Анализ",
+  "patterns": "Паттерны"
+}

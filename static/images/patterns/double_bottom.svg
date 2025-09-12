@@ -1,0 +1,171 @@
+<svg width="1800" height="1000" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gridGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F8FAFC" />
+      <stop offset="100%" stop-color="#FFFFFF" />
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L10,3 L0,6 Z" fill="#2ecc71"/>
+    </marker>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+
+  <!-- Сетка -->
+  <g stroke="#E2E8F0" stroke-width="1">
+    <line x1="100" y1="200" x2="1700" y2="200"/>
+    <line x1="100" y1="350" x2="1700" y2="350"/>
+    <line x1="100" y1="500" x2="1700" y2="500"/>
+    <line x1="100" y1="650" x2="1700" y2="650"/>
+    <line x1="100" y1="800" x2="1700" y2="800"/>
+    <line x1="250" y1="150" x2="250" y2="850"/>
+    <line x1="500" y1="150" x2="500" y2="850"/>
+    <line x1="750" y1="150" x2="750" y2="850"/>
+    <line x1="1000" y1="150" x2="1000" y2="850"/>
+    <line x1="1250" y1="150" x2="1250" y2="850"/>
+    <line x1="1500" y1="150" x2="1500" y2="850"/>
+  </g>
+
+  <!-- Ценовые уровни -->
+  <text x="80" y="200" text-anchor="end" fill="#64748B" font-size="14" font-weight="bold">1.250</text>
+  <text x="80" y="350" text-anchor="end" fill="#64748B" font-size="14" font-weight="bold">1.200</text>
+  <text x="80" y="500" text-anchor="end" fill="#64748B" font-size="14" font-weight="bold">1.150</text>
+  <text x="80" y="650" text-anchor="end" fill="#64748B" font-size="14" font-weight="bold">1.100</text>
+  <text x="80" y="800" text-anchor="end" fill="#64748B" font-size="14" font-weight="bold">1.050</text>
+
+  <!-- Японские свечи с различными паттернами -->
+  <g class="candles">
+    <!-- Нисходящий тренд с разными медвежьими свечами -->
+    <line x1="280" y1="220" x2="280" y2="180" stroke="#e74c3c" stroke-width="2"/>
+    <rect x="272" y="220" width="16" height="40" fill="#e74c3c"/>
+    <line x1="280" y1="260" x2="280" y2="280" stroke="#e74c3c" stroke-width="2"/>
+
+    <line x1="310" y1="250" x2="310" y2="190" stroke="#e74c3c" stroke-width="2"/>
+    <rect x="302" y="250" width="16" height="60" fill="#e74c3c"/>
+    <line x1="310" y1="310" x2="310" y2="330" stroke="#e74c3c" stroke-width="2"/>
+
+    <!-- Доджи - нерешительность -->
+    <line x1="340" y1="320" x2="340" y2="280" stroke="#64748B" stroke-width="2"/>
+    <rect x="332" y="305" width="16" height="10" fill="#64748B"/>
+    <line x1="340" y1="315" x2="340" y2="350" stroke="#64748B" stroke-width="2"/>
+
+    <!-- Медвежье поглощение -->
+    <line x1="370" y1="350" x2="370" y2="320" stroke="#e74c3c" stroke-width="2"/>
+    <rect x="362" y="320" width="16" height="70" fill="#e74c3c"/>
+    <line x1="370" y1="390" x2="370" y2="420" stroke="#e74c3c" stroke-width="2"/>
+
+    <!-- Первое дно - Молот (бычий разворот) -->
+    <line x1="400" y1="450" x2="400" y2="380" stroke="#2ecc71" stroke-width="2"/>
+    <rect x="392" y="440" width="16" height="10" fill="#2ecc71"/>
+    <line x1="400" y1="380" x2="400" y2="320" stroke="#2ecc71" stroke-width="2"/>
+
+    <!-- Консолидация у дна -->
+    <line x1="430" y1="430" x2="430" y2="400" stroke="#e74c3c" stroke-width="2"/>
+    <rect x="422" y="420" width="16" height="10" fill="#e74c3c"/>
+    <line x1="430" y1="400" x2="430" y2="370" stroke="#e74c3c" stroke-width="2"/>
+
+    <line x1="460" y1="440" x2="460" y2="410" stroke="#2ecc71" stroke-width="2"/>
+    <rect x="452" y="430" width="16" height="10" fill="#2ecc71"/>
+    <line x1="460" y1="410" x2="460" y2="380" stroke="#2ecc71" stroke-width="2"/>
+
+    <!-- Отскок от первого дна -->
+    <line x1="490" y1="420" x2="490" y2="380" stroke="#2ecc71" stroke-width="2"/>
+    <rect x="482" y="400" width="16" height="20" fill="#2ecc71"/>
+    <line x1="490" y1="380" x2="490" y2="350" stroke="#2ecc71" stroke-width="2"/>
+
+    <!-- Бычье поглощение -->
+    <line x1="520" y1="380" x2="520" y2="350" stroke="#2ecc71" stroke-width="2"/>
+    <rect x="512" y="350" width="16" height="60" fill="#2ecc71"/>
+    <line x1="520" y1="320" x2="520" y2="290" stroke="#2ecc71" stroke-width="2"/>
+
+    <!-- Второе падение -->
+    <line x1="550" y1="420" x2="550" y2="380" stroke="#e74c3c" stroke-width="2"/>
+    <rect x="542" y="400" width="16" height="20" fill="#e74c3c"/>
+    <line x1="550" y1="380" x2="550" y2="350" stroke="#e74c3c" stroke-width="2"/>
+
+    <line x1="580" y1="450" x2="580" y2="400" stroke="#e74c3c" stroke-width="2"/>
+    <rect x="572" y="430" width="16" height="20" fill="#e74c3c"/>
+    <line x1="580" y1="400" x2="580" y2="370" stroke="#e74c3c" stroke-width="2"/>
+
+    <!-- Второе дно - Молот (бычий разворот) -->
+    <line x1="610" y1="480" x2="610" y2="420" stroke="#2ecc71" stroke-width="2"/>
+    <rect x="602" y="470" width="16" height="10" fill="#2ecc71"/>
+    <line x1="610" y1="420" x2="610" y2="380" stroke="#2ecc71" stroke-width="2"/>
+
+    <!-- Доджи у дна -->
+    <line x1="640" y1="470" x2="640" y2="440" stroke="#64748B" stroke-width="2"/>
+    <rect x="632" y="460" width="16" height="10" fill="#64748B"/>
+    <line x1="640" y1="450" x2="640" y2="480" stroke="#64748B" stroke-width="2"/>
+
+    <!-- Начало роста - Три белых солдата -->
+    <line x1="670" y1="450" x2="670" y2="420" stroke="#2ecc71" stroke-width="2"/>
+    <rect x="662" y="430" width="16" height="20" fill="#2ecc71"/>
+    <line x1="670" y1="420" x2="670" y2="390" stroke="#2ecc71" stroke-width="2"/>
+
+    <line x1="700" y1="420" x2="700" y2="380" stroke="#2ecc71" stroke-width="2"/>
+    <rect x="692" y="400" width="16" height="20" fill="#2ecc71"/>
+    <line x1="700" y1="380" x2="700" y2="350" stroke="#2ecc71" stroke-width="2"/>
+
+    <line x1="730" y1="390" x2="730" y2="350" stroke="#2ecc71" stroke-width="2"/>
+    <rect x="722" y="370" width="16" height="20" fill="#2ecc71"/>
+    <line x1="730" y1="350" x2="730" y2="320" stroke="#2ecc71" stroke-width="2"/>
+
+    <!-- Пробой линии шеи -->
+    <line x1="760" y1="360" x2="760" y2="320" stroke="#2ecc71" stroke-width="2"/>
+    <rect x="752" y="340" width="16" height="20" fill="#2ecc71"/>
+    <line x1="760" y1="320" x2="760" y2="290" stroke="#2ecc71" stroke-width="2"/>
+
+    <!-- Ретест линии шеи -->
+    <line x1="790" y1="340" x2="790" y2="310" stroke="#e74c3c" stroke-width="2"/>
+    <rect x="782" y="320" width="16" height="20" fill="#e74c3c"/>
+    <line x1="790" y1="310" x2="790" y2="280" stroke="#e74c3c" stroke-width="2"/>
+
+    <!-- Вход после ретеста - бычья свеча -->
+    <line x1="820" y1="320" x2="820" y2="290" stroke="#2ecc71" stroke-width="2"/>
+    <rect x="812" y="300" width="16" height="20" fill="#2ecc71"/>
+    <line x1="820" y1="290" x2="820" y2="260" stroke="#2ecc71" stroke-width="2"/>
+
+    <!-- Продолжение роста -->
+    <line x1="850" y1="300" x2="850" y2="270" stroke="#2ecc71" stroke-width="2"/>
+    <rect x="842" y="280" width="16" height="20" fill="#2ecc71"/>
+    <line x1="850" y1="270" x2="850" y2="240" stroke="#2ecc71" stroke-width="2"/>
+  </g>
+
+  <!-- Уровень поддержки -->
+  <line x1="100" y1="520" x2="1700" y2="520" stroke="#2ecc71" stroke-width="2" stroke-dasharray="5,3" opacity="0.8"/>
+
+  <!-- Линия шеи -->
+  <line x1="400" y1="320" x2="1600" y2="320" stroke="#8B5CF6" stroke-width="2" stroke-dasharray="5,3" opacity="0.8"/>
+
+  <!-- Разметка паттерна -->
+  <circle cx="400" cy="520" r="6" fill="#2ecc71" stroke="#FFF" stroke-width="2" filter="url(#glow)"/>
+  <text x="400" y="560" text-anchor="middle" fill="#000000" font-size="16" font-weight="bold">First Bottom</text>
+
+  <circle cx="610" cy="520" r="6" fill="#2ecc71" stroke="#FFF" stroke-width="2" filter="url(#glow)"/>
+  <text x="610" y="560" text-anchor="middle" fill="#000000" font-size="16" font-weight="bold">Second Bottom</text>
+
+  <circle cx="820" cy="320" r="6" fill="#F59E0B" stroke="#FFF" stroke-width="2" filter="url(#glow)"/>
+  <text x="820" y="290" text-anchor="middle" fill="#000000" font-size="16" font-weight="bold">Entry</text>
+
+  <!-- Стоп-лосс -->
+  <circle cx="610" cy="550" r="5" fill="#e74c3c" stroke="#FFF" stroke-width="2"/>
+  <line x1="820" y1="320" x2="610" y2="550" stroke="#e74c3c" stroke-width="2" stroke-dasharray="4,3" opacity="0.8"/>
+  <text x="715" y="580" text-anchor="middle" fill="#000000" font-size="14" font-weight="bold">Stop Loss</text>
+
+  <!-- Тейк-профит -->
+  <circle cx="1100" cy="200" r="5" fill="#2ecc71" stroke="#FFF" stroke-width="2"/>
+  <line x1="820" y1="320" x2="1100" y2="200" stroke="#2ecc71" stroke-width="2" stroke-dasharray="4,3" opacity="0.8"/>
+  <text x="960" y="170" text-anchor="middle" fill="#000000" font-size="14" font-weight="bold">Take Profit 1:2</text>
+
+  <!-- Подписи -->
+  <text x="900" y="540" text-anchor="middle" fill="#000000" font-size="14" font-weight="bold">Support</text>
+  <text x="1000" y="340" text-anchor="middle" fill="#000000" font-size="14" font-weight="bold">Neckline</text>
+
+  <!-- Стрелка тренда -->
+  <path d="M900,280 L1000,240" stroke="#2ecc71" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="950" y="260" text-anchor="middle" fill="#000000" font-size="14" font-weight="bold">Uptrend</text>
+
+</svg>

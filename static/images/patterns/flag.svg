@@ -1,0 +1,24 @@
+<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#F59E0B" stop-opacity="0.1"/>
+    </linearGradient>
+  </defs>
+
+  <g stroke="#374151" stroke-width="0.5" stroke-dasharray="2,2">
+    <line x1="50" y1="50" x2="250" y2="50"/>
+    <line x1="50" y1="100" x2="250" y2="100"/>
+    <line x1="50" y1="150" x2="250" y2="150"/>
+  </g>
+
+  <!-- Flag pole -->
+  <line x1="100" y1="50" x2="100" y2="150" stroke="#3B82F6" stroke-width="2"/>
+
+  <!-- Flag -->
+  <path d="M100,70 L180,60 L180,90 L100,80 Z" fill="#EF4444" fill-opacity="0.3" stroke="#EF4444" stroke-width="2"/>
+
+  <text x="150" y="30" text-anchor="middle" fill="#F59E0B" font-size="14" font-weight="bold">Флаг</text>
+  <text x="140" y="110" text-anchor="middle" fill="#9CA3AF" font-size="12">Древко</text>
+  <text x="140" y="75" text-anchor="middle" fill="#9CA3AF" font-size="12">Полотнище</text>
+</svg>

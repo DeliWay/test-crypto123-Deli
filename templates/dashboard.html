@@ -1,0 +1,44 @@
+{%extends "base.html"%}
+{%block body%}
+<div class="grid" style="padding:8px">
+  <div class="card">
+    <div id="tv_container" style="height:420px"></div>
+  </div>
+  <div class="card">
+    <h3 data-i18n="ticker">Тикер</h3>
+    <div id="ticker-box">—</div>
+    <h3 data-i18n="calculator">Калькулятор</h3>
+    <div class="calc">
+      <input id="qty" placeholder="Qty">
+      <input id="price" placeholder="Price">
+      <select id="lev">
+        <option>1</option><option>2</option><option>5</option><option>10</option><option>20</option>
+      </select>
+      <div id="calc-out">—</div>
+    </div>
+    <h3 data-i18n="signals">Сигналы</h3>
+    <div id="alerts-list"></div>
+    <a href="/api/export/signals.csv" data-i18n="export">Экспорт CSV</a>
+  </div>
+</div>
+{%endblock%}
+{%block scripts%}
+<script src="https://s3.tradingview.com/tv.js"></script>
+<script src="{{ url_for('static', filename='js/tv.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', ()=>{
+  window.tv.mount('tv_container');
+  // Simple ticker poll
+  async function tick(){
+    try{
+      const r=await fetch('/api/ticker?symbol='+window.app.get().symbol);
+      if(r.status===204){ return; }
+      const j=await r.json();
+      const el=document.getElementById('ticker-box');
+      el.textContent = window.formatPrice(j.lastPrice)+' ('+ (Number(j.price24hPcnt)*100).toFixed(2)+'%)';
+    }catch(e){}
+  }
+  setInterval(tick, 1500); tick();
+});
+</script>
+{%endblock%}

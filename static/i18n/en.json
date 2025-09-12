@@ -1,0 +1,14 @@
+{
+  "title": "Crypto Dashboard",
+  "symbol": "Symbol",
+  "interval": "Interval",
+  "theme": "Theme",
+  "language": "Language",
+  "ticker": "Ticker",
+  "calculator": "Calculator",
+  "signals": "Signals",
+  "export": "Export CSV",
+  "home": "Home",
+  "analysis": "Analysis",
+  "patterns": "Patterns"
+}

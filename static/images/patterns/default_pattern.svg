@@ -1,0 +1,9 @@
+<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="300" height="200" fill="#f3f4f6" rx="10"/>
+  <text x="150" y="100" text-anchor="middle" fill="#6b7280" font-size="16" font-family="Arial">
+    Изображение паттерна
+  </text>
+  <text x="150" y="120" text-anchor="middle" fill="#9ca3af" font-size="12" font-family="Arial">
+    Недоступно
+  </text>
+</svg>

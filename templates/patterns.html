@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Шпаргалка паттернов - CryptoAnalyst Pro</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/patterns.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+</head>
+\1
+{%include '_lang_header.html'%}
+
+    <div class="container">
+        <header class="crypto-header">
+            <div class="header-content">
+                <div class="logo-container">
+                    <a href="/" class="logo-link">
+                        <div class="logo">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="logo-text">
+                            <h1 class="logo-title">CryptoAnalyst Pro</h1>
+                            <div class="logo-subtitle">Patterns Encyclopedia</div>
+                        </div>
+                    </a>
+                </div>
+
+                <div class="header-nav">
+                    <a href="/" class="nav-item">
+                        <div class="nav-icon">
+                            <i class="fas fa-home"></i>
+                        </div>
+                        <span class="nav-text">Главная</span>
+                    </a>
+
+                    <a href="/analyze?symbol=BTCUSDT" class="nav-item">
+                        <div class="nav-icon">
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                        <span class="nav-text">Анализ</span>
+                    </a>
+
+                    <div class="nav-item" id="theme-toggle">
+                        <div class="nav-icon">
+                            <i class="fas fa-moon"></i>
+                        </div>
+                        <span class="nav-text">Тема</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="patterns-main">
+            <!-- Hero Section -->
+            <section class="patterns-hero">
+                <div class="hero-content">
+                    <h1><i class="fas fa-shapes"></i> Энциклопедия торговых паттернов</h1>
+                    <p class="hero-description">
+                        Полное руководство по графическим паттернам технического анализа.
+                        Изучайте, распознавайте и используйте паттерны для принятия торговых решений.
+                    </p>
+                    <div class="hero-stats">
+                        <div class="stat-item">
+                            <i class="fas fa-project-diagram"></i>
+                            <span>20+ паттернов</span>
+                        </div>
+                        <div class="stat-item">
+                            <i class="fas fa-chart-line"></i>
+                            <span>Реальные примеры</span>
+                        </div>
+                        <div class="stat-item">
+                            <i class="fas fa-lightbulb"></i>
+                            <span>Торговые стратегии</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Search and Filter Section -->
+            <section class="patterns-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="pattern-search" placeholder="Поиск паттернов..." class="search-input">
+                </div>
+
+                <div class="filter-buttons">
+                    <button class="filter-btn active" data-filter="all">Все</button>
+                    <button class="filter-btn" data-filter="reversal">Разворотные</button>
+                    <button class="filter-btn" data-filter="continuation">Продолжения</button>
+                    <button class="filter-btn" data-filter="candlestick">Свечные</button>
+                </div>
+
+                <div class="view-controls">
+                    <button class="view-btn active" data-view="grid">
+                        <i class="fas fa-th"></i>
+                    </button>
+                    <button class="view-btn" data-view="list">
+                        <i class="fas fa-list"></i>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Patterns Grid -->
+            <section class="patterns-container">
+                <div class="patterns-grid" id="patterns-grid">
+                    <div class="loading-state">
+                        <div class="loading-spinner"></div>
+                        <p>Загрузка паттернов...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Pattern Detail Modal -->
+            <div class="modal-overlay" id="pattern-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="modal-title">Название паттерна</h3>
+                        <button class="modal-close" id="modal-close">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body" id="modal-body">
+                        <!-- Content will be loaded dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Educational Section -->
+            <section class="educational-section">
+                <h2><i class="fas fa-graduation-cap"></i> Как работать с паттернами</h2>
+
+                <div class="education-grid">
+                    <div class="education-card">
+                        <i class="fas fa-binoculars"></i>
+                        <h4>1. Обнаружение</h4>
+                        <p>Ищите четкие формирования на графике. Паттерн должен быть хорошо видимым и соответствовать классическому описанию.</p>
+                    </div>
+
+                    <div class="education-card">
+                        <i class="fas fa-check-circle"></i>
+                        <h4>2. Подтверждение</h4>
+                        <p>Дождитесь полного формирования паттерна. Ищите подтверждение объемами и другими индикаторами.</p>
+                    </div>
+
+                    <div class="education-card">
+                        <i class="fas fa-arrow-right"></i>
+                        <h4>3. Вход</h4>
+                        <p>Входите в сделку после пробоя ключевых уровней. Используйте стоп-лосс для управления рисками.</p>
+                    </div>
+
+                    <div class="education-card">
+                        <i class="fas fa-target"></i>
+                        <h4>4. Цели</h4>
+                        <p>Устанавливайте тейк-профит на основе измерений паттерна. Фиксируйте прибыль постепенно.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Common Mistakes Section -->
+            <section class="mistakes-section">
+                <h2><i class="fas fa-exclamation-triangle"></i> Частые ошибки</h2>
+
+                <div class="mistakes-list">
+                    <div class="mistake-item">
+                        <i class="fas fa-times-circle"></i>
+                        <div class="mistake-content">
+                            <h4>Торговля до подтверждения</h4>
+                            <p>Не входите в сделку до полного формирования паттерна. Терпение - ключ к успеху.</p>
+                        </div>
+                    </div>
+
+                    <div class="mistake-item">
+                        <i class="fas fa-times-circle"></i>
+                        <div class="mistake-content">
+                            <h4>Игнорирование объема</h4>
+                            <p>Объем - важнейший подтверждающий фактор. Без объема паттерн ненадежен.</p>
+                        </div>
+                    </div>
+
+                    <div class="mistake-item">
+                        <i class="fas fa-times-circle"></i>
+                        <div class="mistake-content">
+                            <h4>Отсутствие стоп-лосса</h4>
+                            <p>Всегда устанавливайте стоп-лосс. Ни один паттерн не дает 100% гарантии.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="patterns-footer">
+            <div class="footer-content">
+                <p>&copy; 2025 CryptoAnalyst Pro | Энциклопедия паттернов</p>
+                <p class="educational-note">
+                    <i class="fas fa-info-circle"></i>
+                    Материалы предназначены для образовательных целей. Всегда проводите собственный анализ.
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Data templates for patterns -->
+    <template id="pattern-card-template">
+    <div class="pattern-card" data-type="" data-name="">
+        <div class="pattern-header">
+            <div class="pattern-icon">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="pattern-title">
+                <h3 class="pattern-name"></h3>
+                <span class="pattern-type-badge"></span>
+            </div>
+        </div>
+
+        <!-- ДОБАВИТЬ ЭТОТ БЛОК -->
+        <div class="pattern-visual">
+            <img src="" alt="" class="pattern-image">
+            <div class="image-fallback" style="display: none;">
+                <i class="fas fa-image"></i>
+                <span>Изображение недоступно</span>
+            </div>
+        </div>
+
+        <div class="pattern-body">
+            <p class="pattern-description"></p>
+            <div class="pattern-meta">
+                <span class="pattern-reliability">
+                    <i class="fas fa-star"></i>
+                    <span class="reliability-text"></span>
+                </span>
+                <span class="pattern-trend">
+                    <i class="fas fa-arrow-up"></i>
+                    <span class="trend-direction"></span>
+                </span>
+            </div>
+        </div>
+        <div class="pattern-actions">
+            <button class="pattern-details-btn">
+                <i class="fas fa-info-circle"></i> Подробнее
+            </button>
+        </div>
+    </div>
+</template>
+
+    <template id="pattern-modal-template">
+        <div class="pattern-details">
+            <div class="detail-section">
+                <img src="" alt="" class="modal-pattern-image">
+            </div>
+
+            <div class="detail-section">
+                <h4><i class="fas fa-info-circle"></i> Описание</h4>
+                <p class="detail-description"></p>
+            </div>
+
+            <div class="detail-section">
+                <h4><i class="fas fa-bullseye"></i> Торговые сигналы</h4>
+                <div class="signals-grid">
+                    <div class="signal-item">
+                        <i class="fas fa-arrow-right"></i>
+                        <strong>Вход:</strong> <span class="signal-entry"></span>
+                    </div>
+                    <div class="signal-item">
+                        <i class="fas fa-shield-alt"></i>
+                        <strong>Стоп-лосс:</strong> <span class="signal-stop"></span>
+                    </div>
+                    <div class="signal-item">
+                        <i class="fas fa-target"></i>
+                        <strong>Цель:</strong> <span class="signal-target"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <h4><i class="fas fa-chart-bar"></i> Особенности</h4>
+                <ul class="pattern-features"></ul>
+            </div>
+
+            <div class="detail-section">
+                <h4><i class="fas fa-lightbulb"></i> Советы по торговле</h4>
+                <div class="trading-tips"></div>
+            </div>
+
+            <div class="detail-section">
+                <h4><i class="fas fa-exclamation-triangle"></i> Что искать</h4>
+                <div class="key-points"></div>
+            </div>
+        </div>
+    </template>
+
+    <script src="{{ url_for('static', filename='js/patterns.js') }}"></script>
+
+    <script>
+        // Инициализация после загрузки DOM
+        document.addEventListener('DOMContentLoaded', function() {
+            // Загрузка данных паттернов
+            loadPatternsData();
+
+            // Инициализация управления темой
+            initTheme();
+
+            // Инициализация поиска и фильтров
+            initSearchAndFilters();
+
+            // Инициализация модального окна
+            initModal();
+        });
+
+        // Загрузка данных паттернов
+        async function loadPatternsData() {
+            try {
+                const container = document.getElementById('patterns-grid');
+                container.innerHTML = `
+                    <div class="loading-state">
+                        <div class="loading-spinner"></div>
+                        <p>Загрузка паттернов...</p>
+                    </div>
+                `;
+
+                const response = await fetch('/api/patterns');
+                if (!response.ok) throw new Error('Ошибка загрузки данных');
+
+                const data = await response.json();
+
+                if (data.success) {
+                    renderPatterns(data.patterns);
+                } else {
+                    throw new Error(data.error || 'Ошибка загрузки данных');
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки паттернов:', error);
+                showErrorState('Не удалось загрузить данные паттернов');
+            }
+        }
+
+        // Отображение паттернов
+        function renderPatterns(patterns) {
+            const container = document.getElementById('patterns-grid');
+
+            if (!patterns || patterns.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-search"></i>
+                        <p>Паттерны не найдены</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const template = document.getElementById('pattern-card-template');
+
+            container.innerHTML = patterns.map(pattern => {
+                return `
+                    <div class="pattern-card" data-type="${getPatternTypeClass(pattern.type)}" data-name="${pattern.name.toLowerCase()}">
+                        <div class="pattern-header">
+                            <div class="pattern-icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div class="pattern-title">
+                                <h3 class="pattern-name">${pattern.name}</h3>
+                                <span class="pattern-type-badge ${getPatternTypeClass(pattern.type)}">
+                                    ${pattern.type}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="pattern-body">
+                            <p class="pattern-description">${pattern.description}</p>
+
+                            <div class="pattern-meta">
+                                <span class="pattern-reliability">
+                                    <i class="fas fa-star"></i>
+                                    <span class="reliability-text">${pattern.confidence}</span>
+                                </span>
+                                <span class="pattern-trend">
+                                    <i class="fas fa-arrow-up"></i>
+                                    <span class="trend-direction">${getTrendDirection(pattern.type)}</span>
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="pattern-actions">
+                            <button class="pattern-details-btn" data-pattern='{"name":"${pattern.name}","type":"${pattern.type}","confidence":"${pattern.confidence}","description":"${pattern.description}"}'>
+                                <i class="fas fa-info-circle"></i> Подробнее
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Добавляем обработчики клика на карточки
+            setTimeout(() => {
+                document.querySelectorAll('.pattern-card').forEach(card => {
+                    card.addEventListener('click', (e) => {
+                        if (!e.target.closest('.pattern-details-btn')) {
+                            const patternName = card.querySelector('.pattern-name').textContent;
+                            const patterns = JSON.parse(document.getElementById('patterns-data').textContent);
+                            const pattern = patterns.find(p => p.name === patternName);
+                            if (pattern) {
+                                showPatternDetails(pattern);
+                            }
+                        }
+                    });
+                });
+            }, 100);
+        }
+
+        // Показать детали паттерна
+        function showPatternDetails(pattern) {
+            console.log('Showing pattern details:', pattern);
+
+            const modal = document.getElementById('pattern-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalBody = document.getElementById('modal-body');
+
+            modalTitle.textContent = pattern.name;
+
+            modalBody.innerHTML = `
+                <div class="pattern-details">
+
+                    <div class="detail-section">
+                        <img src="${imageUrl}" alt="${pattern.name}"
+                             onerror="this.src='/static/images/patterns/default_pattern.svg'"
+                             class="modal-pattern-image">
+                    </div>
+
+                    <div class="detail-section">
+                        <h4><i class="fas fa-info-circle"></i> Описание</h4>
+                        <p class="detail-description">${pattern.description}</p>
+                    </div>
+
+                    <div class="detail-section">
+                        <h4><i class="fas fa-bullseye"></i> Торговые сигналы</h4>
+                        <div class="signals-grid">
+                            <div class="signal-item">
+                                <i class="fas fa-arrow-right"></i>
+                                <strong>Вход:</strong> <span class="signal-entry">${getEntrySignal(pattern.type)}</span>
+                            </div>
+                            <div class="signal-item">
+                                <i class="fas fa-shield-alt"></i>
+                                <strong>Стоп-лосс:</strong> <span class="signal-stop">${getStopSignal(pattern.type)}</span>
+                            </div>
+                            <div class="signal-item">
+                                <i class="fas fa-target"></i>
+                                <strong>Цель:</strong> <span class="signal-target">${getTargetSignal(pattern.type)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="detail-section">
+                        <h4><i class="fas fa-chart-bar"></i> Особенности</h4>
+                        <ul class="pattern-features">
+                            ${getPatternFeatures(pattern).map(feature => `
+                                <li>${feature}</li>
+                            `).join('')}
+                        </ul>
+                    </div>
+
+                    <div class="detail-section">
+                        <h4><i class="fas fa-lightbulb"></i> Советы по торговле</h4>
+                        <div class="trading-tips">
+                            ${getTradingTips(pattern).map(tip => `
+                                <div>${tip}</div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="detail-section">
+                        <h4><i class="fas fa-exclamation-triangle"></i> Что искать</h4>
+                        <div class="key-points">
+                            ${getKeyPoints(pattern).map(point => `
+                                <div>${point}</div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    ${pattern.easter_egg ? `
+                    <div class="detail-section">
+                        <h4><i class="fas fa-key"></i> Секрет успеха</h4>
+                        <div class="key-points">
+                            <div>${pattern.easter_egg}</div>
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+
+            // Показываем модальное окно
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+
+            // Анимация появления
+            setTimeout(() => {
+                modal.style.opacity = '1';
+                modal.querySelector('.modal-content').style.transform = 'translateY(0) scale(1)';
+            }, 10);
+        }
+
+        // Вспомогательные функции
+        function getPatternTypeClass(type) {
+            const typeMap = {
+                'Разворотный': 'reversal',
+                'Продолжения': 'continuation',
+                'Свечной': 'candlestick'
+            };
+            return typeMap[type] || 'reversal';
+        }
+
+        function getTrendDirection(type) {
+            return type === 'Продолжения' ? 'Следование тренду' : 'Разворот тренда';
+        }
+
+        function getEntrySignal(type) {
+            const signals = {
+                'Разворотный': 'После подтверждения разворота и пробоя ключевого уровня',
+                'Продолжения': 'На откате к поддержке/сопротивлению с подтверждением объема',
+                'Свечной': 'После закрытия свечи подтверждения следующей свечой'
+            };
+            return signals[type] || 'После подтверждения паттерна и confluence факторов';
+        }
+
+        function getStopSignal(type) {
+            const stops = {
+                'Разворотный': '2-3% за ключевым уровнем поддержки/сопротивления',
+                'Продолжения': '1-2% за локальным минимумом/максимумом',
+                'Свечной': 'За экстремумом свечи подтверждения'
+            };
+            return stops[type] || '2-3% за ключевым уровнем';
+        }
+
+        function getTargetSignal(type) {
+            const targets = {
+                'Разворотный': '1:2-1:3 риск/вознаграждение, измерение от линии шеи',
+                'Продолжения': '1:1.5-1:2 риск/вознаграждение, продолжение тренда',
+                'Свечной': '1:1-1:1.5 риск/вознаграждение, ближайшие уровни'
+            };
+            return targets[type] || '1:1.5 риск/вознаграждение';
+        }
+
+        function getPatternFeatures(pattern) {
+            return [
+                `Надежность: ${pattern.confidence}`,
+                `Тип: ${pattern.type}`,
+                `Вероятность успеха: ${getSuccessProbability(pattern.confidence)}`,
+                `Рекомендуемый таймфрейм: ${getRecommendedTimeframe(pattern.type)}`,
+                pattern.easter_egg ? `Ключевой момент: ${pattern.easter_egg}` : 'Требует подтверждения объемом'
+            ];
+        }
+
+        function getSuccessProbability(confidence) {
+            const probabilities = {
+                'Высокая': '70-80%',
+                'Средняя': '50-60%',
+                'Низкая': '30-40%'
+            };
+            return probabilities[confidence] || '50-60%';
+        }
+
+        function getRecommendedTimeframe(type) {
+            const timeframes = {
+                'Разворотный': '4H - Daily',
+                'Продолжения': '1H - 4H',
+                'Свечной': '15M - 1H'
+            };
+            return timeframes[type] || '1H - 4H';
+        }
+
+        function getTradingTips(pattern) {
+            return [
+                'Дождитесь полного формирования паттерна',
+                'Ищите подтверждение объемами (увеличение на пробое)',
+                'Используйте дополнительные индикаторы (RSI, MACD) для подтверждения',
+                'Устанавливайте стоп-лосс сразу при входе в сделку',
+                'Фиксируйте часть прибыли на первом целевом уровне',
+                'Торгуйте только при наличии четких сигналов'
+            ];
+        }
+
+        function getKeyPoints(pattern) {
+            return [
+                'Четкое графическое формирование по классическому описанию',
+                'Соответствие текущему рыночному контексту и тренду',
+                'Подтверждение объемом торгов на ключевых моментах',
+                'Отсутствие конфликтующих сигналов от индикаторов',
+                'Соответствие паттерна таймфрейму (большие TF = надежнее)'
+            ];
+        }
+
+        // Инициализация поиска и фильтров
+        function initSearchAndFilters() {
+            const searchInput = document.getElementById('pattern-search');
+            const filterButtons = document.querySelectorAll('.filter-btn');
+            const viewButtons = document.querySelectorAll('.view-btn');
+
+            // Поиск
+            searchInput.addEventListener('input', (e) => {
+                filterPatterns(e.target.value.toLowerCase());
+            });
+
+            // Фильтры
+            filterButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    filterButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    applyFilter(btn.dataset.filter);
+                });
+            });
+
+            // Вид отображения
+            viewButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    viewButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    changeView(btn.dataset.view);
+                });
+            });
+        }
+
+        // Фильтрация паттернов
+        function filterPatterns(searchTerm) {
+            const patterns = document.querySelectorAll('.pattern-card');
+            let visibleCount = 0;
+
+            patterns.forEach(pattern => {
+                const patternName = pattern.querySelector('.pattern-name').textContent.toLowerCase();
+                const patternDescription = pattern.querySelector('.pattern-description').textContent.toLowerCase();
+                const isVisible = patternName.includes(searchTerm) ||
+                                 patternDescription.includes(searchTerm) ||
+                                 searchTerm === '';
+
+                pattern.style.display = isVisible ? 'block' : 'none';
+                if (isVisible) visibleCount++;
+            });
+
+            // Если ничего не найдено
+            if (visibleCount === 0 && searchTerm !== '') {
+                document.getElementById('patterns-grid').innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-search"></i>
+                        <p>Ничего не найдено для "${searchTerm}"</p>
+                        <button class="btn btn-primary" onclick="document.getElementById('pattern-search').value='';filterPatterns('')">
+                            <i class="fas fa-times"></i> Очистить поиск
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        // Применение фильтра
+        function applyFilter(filterType) {
+            const patterns = document.querySelectorAll('.pattern-card');
+            let visibleCount = 0;
+
+            patterns.forEach(pattern => {
+                const patternType = pattern.dataset.type;
+                const isVisible = filterType === 'all' || patternType === filterType;
+
+                pattern.style.display = isVisible ? 'block' : 'none';
+                if (isVisible) visibleCount++;
+            });
+
+            if (visibleCount === 0 && filterType !== 'all') {
+                document.getElementById('patterns-grid').innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-filter"></i>
+                        <p>Нет паттернов типа "${filterType}"</p>
+                        <button class="btn btn-primary" onclick="applyFilter('all')">
+                            <i class="fas fa-eye"></i> Показать все
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        // Изменение вида отображения
+        function changeView(viewType) {
+            const grid = document.getElementById('patterns-grid');
+
+            if (viewType === 'list') {
+                grid.classList.add('list-view');
+            } else {
+                grid.classList.remove('list-view');
+            }
+        }
+
+        // Инициализация модального окна
+        function initModal() {
+            const modal = document.getElementById('pattern-modal');
+            const closeBtn = document.getElementById('modal-close');
+
+            // Начальные стили для анимации
+            modal.style.opacity = '0';
+            modal.querySelector('.modal-content').style.transform = 'translateY(20px) scale(0.95)';
+            modal.style.transition = 'opacity 0.3s ease';
+            modal.querySelector('.modal-content').style.transition = 'transform 0.3s ease';
+
+            // Закрытие по кнопке
+            closeBtn.addEventListener('click', closeModal);
+
+            // Закрытие по клику вне модального окна
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeModal();
+                }
+            });
+
+            // Закрытие по ESC
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && modal.style.display === 'flex') {
+                    closeModal();
+                }
+            });
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('pattern-modal');
+
+            // Анимация закрытия
+            modal.style.opacity = '0';
+            modal.querySelector('.modal-content').style.transform = 'translateY(20px) scale(0.95)';
+
+            setTimeout(() => {
+                modal.style.display = 'none';
+                document.body.style.overflow = 'auto';
+            }, 300);
+        }
+
+        // Показать состояние ошибки
+        function showErrorState(message) {
+            const container = document.getElementById('patterns-grid');
+            container.innerHTML = `
+                <div class="error-state">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>${message}</p>
+                    <button class="btn btn-primary" onclick="loadPatternsData()">
+                        <i class="fas fa-sync-alt"></i> Попробовать снова
+                    </button>
+                </div>
+            `;
+        }
+
+        // Инициализация темы
+        function initTheme() {
+            const themeToggle = document.getElementById('theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    const currentTheme = document.documentElement.getAttribute('data-theme');
+                    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+                    document.documentElement.setAttribute('data-theme', newTheme);
+                    localStorage.setItem('cryptoanalyst_theme', newTheme);
+
+                    const themeIcon = document.querySelector('#theme-toggle i');
+                    if (themeIcon) {
+                        themeIcon.className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+                    }
+                });
+            }
+
+            // Загрузка сохраненной темы
+            const savedTheme = localStorage.getItem('cryptoanalyst_theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+
+            const themeIcon = document.querySelector('#theme-toggle i');
+            if (themeIcon) {
+                themeIcon.className = savedTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+            }
+        }
+
+        // Глобальные функции для перезагрузки
+        window.loadPatternsData = loadPatternsData;
+        window.showPatternDetails = showPatternDetails;
+        window.applyFilter = applyFilter;
+        window.filterPatterns = filterPatterns;
+        window.closeModal = closeModal;
+    </script>
+
+    <!-- Скрытый элемент для хранения данных -->
+    <script id="patterns-data" type="application/json">[]</script>
+<script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+\1
+</html>

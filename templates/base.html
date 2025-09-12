@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{title or "Crypto Dashboard"}}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/calc.css') }}">
+  {%block head%}{%endblock%}
+</head>
+<body class="tabular">
+  <div class="controls" style="padding:8px">
+    <select id="langSwitcher">
+      <option value="ru">RU</option>
+      <option value="en">EN</option>
+    </select>
+    <button onclick="theme.toggle()" data-i18n="theme">Тема</button>
+  </div>
+  {%block body%}{%endblock%}
+
+  <script src="{{ url_for('static', filename='js/format.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/store.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/alerts.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/guards.js') }}"></script>
+  {%block scripts%}{%endblock%}
+  <script>window.guards.noDuplicateScripts();</script>
+</body>
+</html>

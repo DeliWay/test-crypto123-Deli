@@ -1,0 +1,11 @@
+<style>
+.lang-header{position:fixed;top:8px;right:8px;z-index:9999;display:flex;gap:8px;align-items:center;background:rgba(0,0,0,.35);backdrop-filter:saturate(1.2) blur(6px);padding:6px 8px;border-radius:10px}
+.lang-header select{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.25);padding:2px 6px;border-radius:8px}
+.lang-header button{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.25);padding:2px 8px;border-radius:8px;cursor:pointer}
+@media (prefers-color-scheme: light){.lang-header{background:rgba(255,255,255,.7)} .lang-header select,.lang-header button{color:#111;border-color:rgba(0,0,0,.2)}}
+</style>
+<div class="lang-header">
+  <span data-i18n="language">Language</span>
+  <select id="langSwitcher"><option value="ru">RU</option><option value="en">EN</option></select>
+  <button type="button" onclick="theme && theme.toggle()" data-i18n="theme">Theme</button>
+</div>

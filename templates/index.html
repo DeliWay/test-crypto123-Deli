@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoAnalyst Pro - Анализ криптовалют</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+</head>
+\1
+{%include '_lang_header.html'%}
+
+    <div class="container">
+        <header class="crypto-header">
+            <div class="header-content">
+                <div class="logo-container">
+                    <a href="/" class="logo-link">
+                        <div class="logo">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="logo-text">
+                            <h1 class="logo-title">CryptoAnalyst Pro</h1>
+                            <div class="logo-subtitle">Advanced Market Insights</div>
+                        </div>
+                    </a>
+                </div>
+
+                <div class="header-nav">
+                    <a href="https://www.bybit.com/invite?ref=PQ1JPW" target="_blank" class="nav-item">
+                        <div class="nav-icon">
+                            <i class="fas fa-rocket"></i>
+                        </div>
+                        <span class="nav-text">Bybit</span>
+                    </a>
+
+                    <a href="https://www.donationalerts.com/r/deimex" target="_blank" class="nav-item">
+                        <div class="nav-icon">
+                            <i class="fas fa-donate"></i>
+                        </div>
+                        <span class="nav-text">Поддержать</span>
+                    </a>
+
+                    <div class="nav-item" id="theme-toggle">
+                        <div class="nav-icon">
+                            <i class="fas fa-moon"></i>
+                        </div>
+                        <span class="nav-text">Тема</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <!-- Hero Section -->
+            <section class="hero-section">
+                <div class="hero-content">
+                    <h2>Профессиональный анализ криптовалют</h2>
+                    <p>Технический анализ, торговые сигналы и аналитика в реальном времени</p>
+                </div>
+            </section>
+
+            <!-- Symbol Selection Section -->
+            <section class="selection-section">
+                <div class="selection-card">
+                    <h3><i class="fas fa-search"></i> Выбор криптовалюты для анализа</h3>
+                    <form id="analysis-form" action="/analyze" method="post">
+                        <div class="form-group">
+                            <label for="symbol">
+                                <i class="fas fa-coins"></i> Криптовалюта:
+                            </label>
+                            <select name="symbol" id="symbol" required>
+                                <option value="">-- Выберите торговую пару --</option>
+                                {%for symbol in symbols%}
+                                <option value="{{symbol}}">{{symbol}}</option>
+                                {%endfor%}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="timeframe">
+                                <i class="fas fa-clock"></i> Таймфрейм:
+                            </label>
+                            <select name="timeframe" id="timeframe">
+                                <option value="1">1 минута</option>
+                                <option value="5">5 минут</option>
+                                <option value="15">15 минут</option>
+                                <option value="30">30 минут</option>
+                                <option value="60" selected>1 час</option>
+                                <option value="240">4 часа</option>
+                                <option value="D">1 день</option>
+                                <option value="W">1 неделя</option>
+                                <option value="M">1 месяц</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" class="analyze-btn" id="analyze-button">
+                            <i class="fas fa-chart-line"></i> Запустить анализ
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Quick Actions -->
+            <section class="quick-actions-section">
+                <h3><i class="fas fa-bolt"></i> Быстрые действия</h3>
+                <div class="action-buttons">
+                    <a href="/patterns" class="action-btn">
+                        <i class="fas fa-book"></i> Шпаргалка паттернов
+                    </a>
+                    <button class="action-btn" id="refresh-top-cryptos">
+                        <i class="fas fa-sync-alt"></i> Обновить данные
+                    </button>
+                    <button class="action-btn" id="easter-egg-btn">
+                        <i class="fas fa-key"></i> Секретные фишки
+                    </button>
+                </div>
+            </section>
+
+            <!-- Live Crypto Dashboard -->
+            <section class="dashboard-section">
+                <div class="section-header">
+                    <h3><i class="fas fa-fire"></i> Топ криптовалюты в реальном времени</h3>
+                    <div class="last-update" id="last-update">
+                        <i class="fas fa-clock"></i> Обновление: <span id="update-time">Загрузка...</span>
+                    </div>
+                </div>
+
+                <div class="dashboard-content">
+                    <div class="crypto-grid" id="crypto-dashboard">
+                        <div class="loading-state">
+                            <div class="loading-spinner"></div>
+                            <p>Загрузка данных с биржи Bybit...</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Popular Cryptos Grid -->
+            <section class="popular-cryptos-section">
+                <h3><i class="fas fa-star"></i> Популярные торговые пары</h3>
+                <div class="popular-grid">
+                    {%for symbol in ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'ADAUSDT', 'DOGEUSDT', 'MATICUSDT']%}
+                    <div class="popular-crypto-card">
+                        <div class="crypto-icon">
+                            <i class="fas fa-coins"></i>
+                        </div>
+                        <div class="crypto-info">
+                            <h4>{{symbol}}</h4>
+                            <a href="/analyze?symbol={{symbol}}&timeframe=60" class="quick-analysis-link">
+                                <i class="fas fa-chart-bar"></i> Быстрый анализ
+                            </a>
+                        </div>
+                    </div>
+                    {%endfor%}
+                </div>
+            </section>
+
+            <!-- Features Section -->
+            <section class="features-section">
+                <h3><i class="fas fa-gem"></i> Возможности платформы</h3>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <i class="fas fa-chart-line"></i>
+                        <h4>Технический анализ</h4>
+                        <p>RSI, MACD, Bollinger Bands, Stochastic и другие индикаторы</p>
+                    </div>
+                    <div class="feature-card">
+                        <i class="fas fa-shapes"></i>
+                        <h4>Графические паттерны</h4>
+                        <p>Автоматическое обнаружение ценовых паттернов</p>
+                    </div>
+                    <div class="feature-card">
+                        <i class="fas fa-bolt"></i>
+                        <h4>Real-time данные</h4>
+                        <p>Актуальные данные с биржи Bybit каждые 10 секунд</p>
+                    </div>
+                    <div class="feature-card">
+                        <i class="fas fa-brain"></i>
+                        <h4>Торговые сигналы</h4>
+                        <p>Четкие рекомендации: ПОКУПАТЬ/ПРОДАВАТЬ/НЕЙТРАЛЬНО</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="main-footer">
+            <div class="footer-content">
+                <p>&copy; 2025 CryptoAnalyst Pro | Профессиональная аналитическая платформа</p>
+                <p class="disclaimer">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Для образовательных целей. Торгуйте осторожно, криптовалюты - высокорисковые активы.
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+        // Инициализация после загрузки DOM
+        document.addEventListener('DOMContentLoaded', function() {
+            // Загрузка данных с сервера
+            loadTopCryptosFromServer();
+
+            // Инициализация управления темой
+            initTheme();
+
+            // Инициализация поиска
+            setupSymbolSearch();
+        });
+
+        // Загрузка данных с сервера
+        async function loadTopCryptosFromServer() {
+            try {
+                const response = await fetch('/api/top-cryptos');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        renderCryptoDashboard(data.cryptos);
+                        updateLastUpdateTime();
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки данных:', error);
+            }
+        }
+
+        // Отображение дашборда с криптовалютами
+        function renderCryptoDashboard(cryptos) {
+            const dashboard = document.getElementById('crypto-dashboard');
+            if (!dashboard) return;
+
+            if (!cryptos || cryptos.length === 0) {
+                dashboard.innerHTML = '<div class="empty-state">Нет данных для отображения</div>';
+                return;
+            }
+
+            dashboard.innerHTML = cryptos.map((crypto, index) => `
+                <div class="crypto-card" data-symbol="${crypto.symbol}">
+                    <div class="crypto-header">
+                        <i class="${getCryptoIcon(crypto.symbol)}"></i>
+                        <h4>${crypto.symbol.replace('USDT', '')}</h4>
+                    </div>
+                    <div class="crypto-price ${crypto.price_change >= 0 ? 'price-up' : 'price-down'}">
+                        $${formatPrice(crypto.price)}
+                    </div>
+                    <div class="crypto-change ${crypto.price_change >= 0 ? 'change-up' : 'change-down'}">
+                        <i class="fas ${crypto.price_change >= 0 ? 'fa-arrow-up' : 'fa-arrow-down'}"></i>
+                        ${Math.abs(crypto.price_change).toFixed(2)}%
+                    </div>
+                    <a href="/analyze?symbol=${crypto.symbol}" class="btn btn-primary">
+                        <i class="fas fa-chart-bar"></i> Анализ
+                    </a>
+                </div>
+            `).join('');
+        }
+
+        // Функция для получения иконки криптовалюты
+        function getCryptoIcon(symbol) {
+            const iconMap = {
+                'BTCUSDT': 'fab fa-bitcoin',
+                'ETHUSDT': 'fab fa-ethereum',
+                'BNBUSDT': 'fas fa-coins',
+                'SOLUSDT': 'fas fa-sun',
+                'XRPUSDT': 'fas fa-bolt',
+                'ADAUSDT': 'fas fa-chart-line',
+                'DOGEUSDT': 'fas fa-dog',
+                'MATICUSDT': 'fas fa-shapes',
+                'DOTUSDT': 'fas fa-circle',
+                'LTCUSDT': 'fas fa-money-bill-wave'
+            };
+            return iconMap[symbol] || 'fas fa-coins';
+        }
+
+        // Форматирование цены
+        function formatPrice(price) {
+            if (price >= 1000) return price.toFixed(0);
+            if (price >= 1) return price.toFixed(2);
+            if (price >= 0.01) return price.toFixed(4);
+            return price.toFixed(6);
+        }
+
+        // Обновление времени последнего обновления
+        function updateLastUpdateTime() {
+            const updateElement = document.getElementById('update-time');
+            if (updateElement) {
+                updateElement.textContent = new Date().toLocaleTimeString();
+            }
+        }
+
+        // Инициализация темы
+        function initTheme() {
+            const themeToggle = document.getElementById('theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', toggleTheme);
+            }
+
+            // Загрузка сохраненной темы
+            const savedTheme = localStorage.getItem('cryptoanalyst_theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateThemeIcon(savedTheme);
+        }
+
+        // Переключение темы
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('cryptoanalyst_theme', newTheme);
+            updateThemeIcon(newTheme);
+        }
+
+        // Обновление иконки темы
+        function updateThemeIcon(theme) {
+            const themeIcon = document.querySelector('#theme-toggle i');
+            if (themeIcon) {
+                themeIcon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+            }
+        }
+
+        // Настройка поиска по символам
+        function setupSymbolSearch() {
+            const symbolSelect = document.getElementById('symbol');
+            if (!symbolSelect) return;
+
+            symbolSelect.addEventListener('focus', function() {
+                this.size = 8;
+            });
+
+            symbolSelect.addEventListener('blur', function() {
+                this.size = 1;
+            });
+
+            symbolSelect.addEventListener('keyup', function(e) {
+                const searchValue = e.target.value.toLowerCase();
+                Array.from(this.options).forEach(option => {
+                    option.style.display = option.text.toLowerCase().includes(searchValue) ? '' : 'none';
+                });
+            });
+        }
+
+        // Глобальные функции
+        window.loadTopCryptos = loadTopCryptosFromServer;
+        window.getCryptoIcon = getCryptoIcon;
+        window.formatPrice = formatPrice;
+    </script>
+<script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+\1
+</html>
