@@ -43,6 +43,7 @@ limiter = Limiter(
 )
 
 # CSP политика
+# Обновите CSP политику
 csp = {
     'default-src': "'self'",
     'script-src': [
@@ -56,6 +57,7 @@ csp = {
     'style-src': [
         "'self'",
         "https://fonts.googleapis.com",
+        "https://cdnjs.cloudflare.com",  # Разрешить CDN
         "'unsafe-inline'"
     ],
     'img-src': [
@@ -66,7 +68,7 @@ csp = {
     ],
     'font-src': [
         "'self'",
-        "https://cdnjs.cloudflare.com",
+        "https://cdnjs.cloudflare.com",  # Добавьте это
         "data:"
     ],
     'connect-src': [
@@ -565,6 +567,28 @@ def calculate_profit_potential(market_data, patterns):
             "risk_reward_ratio": "1:0"
         }
 
+@app.route('/api/market-stats/<symbol>')
+@limiter.limit("10 per minute")
+@cache.cached(timeout=30)
+def api_market_stats(symbol):
+    """API для получения рыночной статистики"""
+    try:
+        ticker_info = crypto_api.get_ticker_info(symbol)
+        if not ticker_info:
+            return jsonify({'success': False, 'error': 'No data'}), 404
+
+        return jsonify({
+            'success': True,
+            'symbol': symbol,
+            'volume_24h': ticker_info.get('volume24h', 0),
+            'high_24h': ticker_info.get('highPrice24h', 0),
+            'low_24h': ticker_info.get('lowPrice24h', 0),
+            'price_change': ticker_info.get('price24hPcnt', 0),
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.context_processor
 def utility_processor():
@@ -624,7 +648,7 @@ def analyze():
         # Получение текущей цены
         ticker_info = crypto_api.get_ticker_info(symbol)
         current_price = ticker_info['lastPrice'] if ticker_info else analysis.get('price', 0)
-        price_change = ticker_info['price24hPcnt'] if ticker_info else 0
+        price_change = ticker_info.get('price24hPcnt', 0) if ticker_info else 0
 
         return render_template('analysis.html',
                                symbol=symbol,
@@ -633,7 +657,7 @@ def analyze():
                                patterns=patterns,
                                profit_potential=profit_potential,
                                current_price=current_price,
-                               price_change=price_change,  # Добавьте это
+                               price_change=price_change,  # Добавить это
                                now=datetime.now())
 
     except Exception as e:
@@ -718,8 +742,8 @@ def api_symbols():
 
 
 @app.route('/api/analyze/<symbol>')
-@limiter.limit("10 per minute")
-@cache.cached(timeout=60, query_string=True)
+@limiter.limit("20 per minute")  # Увеличьте лимит
+@cache.cached(timeout=30, query_string=True)
 def api_analyze(symbol):
     """API для анализа символа"""
     try:

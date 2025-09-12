@@ -567,3 +567,52 @@ class AnalysisCore {
 document.addEventListener('DOMContentLoaded', function() {
     AnalysisCore.init();
 });
+
+
+//deepsuck
+// Обработчик переключения языка
+document.getElementById('langSwitcher')?.addEventListener('change', function(e) {
+    const lang = e.target.value;
+    // Здесь будет логика смены языка
+    console.log('Selected language:', lang);
+    // Можно добавить запрос к API для смены языка
+});
+
+// Обработчик темы в хедере
+document.getElementById('header-theme-toggle')?.addEventListener('click', function() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('cryptoanalyst_theme', newTheme);
+
+    const themeIcon = this.querySelector('i');
+    if (themeIcon) {
+        themeIcon.className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    }
+
+    // Обновление TradingView если есть
+    if (window.tradingViewWidget) {
+        try {
+            window.tradingViewWidget.changeTheme(newTheme);
+        } catch (error) {
+            console.warn('Ошибка обновления темы TradingView:', error);
+        }
+    }
+});
+
+// Инициализация иконки темы
+function initThemeIcon() {
+    const themeToggle = document.getElementById('header-theme-toggle');
+    if (!themeToggle) return;
+
+    const themeIcon = themeToggle.querySelector('i');
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+
+    if (themeIcon) {
+        themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    }
+}
+
+// Запуск при загрузке
+document.addEventListener('DOMContentLoaded', initThemeIcon);

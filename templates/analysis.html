@@ -7,50 +7,15 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tradingview.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/inline-styles.css') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
 
 </head>
 {%include '_lang_header.html'%}
 
     <div class="container">
-        <header class="crypto-header">
-            <div class="header-content">
-                <div class="logo-container">
-                    <a href="/" class="logo-link">
-                        <div class="logo">
-                            <i class="fas fa-chart-line"></i>
-                        </div>
-                        <div class="logo-text">
-                            <h1 class="logo-title">CryptoAnalyst Pro</h1>
-                            <div class="logo-subtitle">Technical Analysis</div>
-                        </div>
-                    </a>
-                </div>
-
-                <div class="header-nav">
-                    <a href="/" class="nav-item">
-                        <div class="nav-icon">
-                            <i class="fas fa-home"></i>
-                        </div>
-                        <span class="nav-text">Главная</span>
-                    </a>
-
-                    <a href="/patterns" class="nav-item">
-                        <div class="nav-icon">
-                            <i class="fas fa-book"></i>
-                        </div>
-                        <span class="nav-text">Паттерны</span>
-                    </a>
-
-                    <div class="nav-item" id="theme-toggle">
-                        <div class="nav-icon">
-                            <i class="fas fa-moon"></i>
-                        </div>
-                        <span class="nav-text">Тема</span>
-                    </div>
-                </div>
-            </div>
+        <header>
+            {% include '_header.html' %}
         </header>
 
         <main>
@@ -73,7 +38,7 @@
             <section class="price-header">
                 <div class="price-info">
                     <h3 id="current-symbol">{{ symbol }}</h3>
-                    <div class="price-large" id="current-price">${{ "%.2f"|format(current_price) }}</div>
+                    <div class="price-large" id="current-price">${{ "%.2f"|format(current_price) if current_price else "0.00" }}</div>
                     <div class="price-change {% if price_change >= 0 %}positive{% else %}negative{% endif %}"
                          id="price-change">
                         <i class="fas fa-arrow-{% if price_change >= 0 %}up{% else %}down{% endif %}"></i>
@@ -501,32 +466,48 @@
         // ===== УПРАВЛЕНИЕ ДАННЫМИ =====
         class DataManager {
             static async loadAnalysisData(symbol, timeframe) {
-                try {
-                    UI.showLoadingState();
+              try {
+                // Кэширование на 30 секунд
+                const cacheKey = `analysis_${symbol}_${timeframe}`;
+                const cachedData = sessionStorage.getItem(cacheKey);
+                const cachedTime = sessionStorage.getItem(`${cacheKey}_time`);
 
-                    // Реальный API вызов вместо демо-данных
-                    const response = await fetch(`/api/analyze/${symbol}?timeframe=${timeframe}`);
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    const data = await response.json();
-
-                    if (!data.success) {
-                        throw new Error(data.error || 'Unknown error');
-                    }
-
-                    AppState.currentData = data;
-                    return data;
-                } catch (error) {
-                    console.error('Ошибка загрузки данных анализа:', error);
-                    UI.showError(`Ошибка загрузки данных: ${error.message}`);
-
-                    // Fallback к демо-данным только если API недоступен
-                    const demoData = this.generateDemoData(symbol, timeframe);
-                    AppState.currentData = demoData;
-                    return demoData;
+                if (cachedData && cachedTime && (Date.now() - cachedTime < 30000)) {
+                  return JSON.parse(cachedData);
                 }
+
+                // Добавить задержку между запросами
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                const response = await fetch(`/api/analyze/${symbol}?timeframe=${timeframe}`);
+
+                if (response.status === 429) {
+                  // Если лимит превышен, ждем 5 секунд
+                  await new Promise(resolve => setTimeout(resolve, 5000));
+                  return this.loadAnalysisData(symbol, timeframe);
+                }
+
+                if (!response.ok) {
+                  throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (!data.success) {
+                  throw new Error(data.error || 'Unknown error');
+                }
+
+                // Сохраняем в кэш
+                sessionStorage.setItem(cacheKey, JSON.stringify(data));
+                sessionStorage.setItem(`${cacheKey}_time`, Date.now());
+
+                return data;
+              } catch (error) {
+                console.error('Ошибка загрузки данных анализа:', error);
+
+                // Fallback: используем демо-данные если API недоступен
+                return this.generateDemoData(symbol, timeframe);
+              }
             }
 
             static generateDemoData(symbol, timeframe) {
@@ -605,6 +586,16 @@
             this.initTradingView();
             this.startAutoRefresh();
 
+              // Инициализируем TradingView с задержкой
+            setTimeout(() => {
+                this.initTradingView();
+            }, 1000);
+
+              // Загружаем данные с задержкой чтобы избежать 429
+            setTimeout(() => {
+                this.refreshData();
+            }, 2000);
+
             // Используйте переданные сервером данные для начальной загрузки
             const initialData = {
                 symbol: '{{ symbol }}',
@@ -667,13 +658,22 @@
             }
 
             static async refreshData() {
-                try {
-                    UI.showLoadingState();
-                    const data = await DataManager.loadAnalysisData(AppState.currentSymbol, AppState.currentTimeframe);
-                    this.updateUI(data);
-                } catch (error) {
-                    console.error('Ошибка обновления данных:', error);
-                }
+              try {
+                UI.showLoadingState();
+
+                // Добавляем задержку между запросами
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                const data = await DataManager.loadAnalysisData(
+                  AppState.currentSymbol,
+                  AppState.currentTimeframe
+                );
+
+                this.updateUI(data);
+              } catch (error) {
+                console.error('Ошибка обновления данных:', error);
+                UI.showError('Ошибка загрузки данных. Попробуйте позже.');
+              }
             }
 
             static updateUI(data) {
@@ -697,17 +697,28 @@
             }
 
             static updatePriceData(data) {
+                if (!data) return;
+
+                const priceElement = document.getElementById('current-price');
+                const changeElement = document.getElementById('price-change');
+                const changeIcon = changeElement?.querySelector('i');
+
+                if (!priceElement || !changeElement) {
+                    console.error('Price elements not found');
+                    return;
+                }
+
                 const price = data.analysis?.price || 0;
                 const change = data.analysis?.price_change || 0;
 
-                document.getElementById('current-price').textContent = `$${this.formatPrice(price)}`;
+                priceElement.textContent = `$${this.formatPrice(price)}`;
 
-                const priceChangeElement = document.getElementById('price-change');
-                priceChangeElement.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
-                priceChangeElement.className = `price-change ${change >= 0 ? 'positive' : 'negative'}`;
+                changeElement.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+                changeElement.className = `price-change ${change >= 0 ? 'positive' : 'negative'}`;
 
-                const changeIcon = priceChangeElement.querySelector('i');
-                changeIcon.className = change >= 0 ? 'fas fa-arrow-up' : 'fas fa-arrow-down';
+                if (changeIcon) {
+                    changeIcon.className = change >= 0 ? 'fas fa-arrow-up' : 'fas fa-arrow-down';
+                }
             }
 
             static updateRecommendation(analysis) {
@@ -816,43 +827,217 @@
             }
 
             static initTradingView() {
+              try {
+                // Проверяем загружена ли библиотека TradingView
                 if (typeof TradingView === 'undefined') {
-                    console.error('TradingView widget not loaded');
-                    return;
+                  console.warn('TradingView widget not loaded - library not found');
+                  this.showTradingViewFallback();
+                  return null;
                 }
 
-                AppState.tradingViewWidget = new TradingView.widget({
-                    symbol: `BINANCE:${AppState.currentSymbol}`,
-                    interval: AppState.currentTimeframe,
-                    container_id: "tradingview-chart",
-                    locale: "ru",
-                    autosize: true,
-                    theme: AppState.currentTheme,
-                    style: "1",
-                    toolbar_bg: "#f1f3f6",
-                    enable_publishing: false,
-                    hide_top_toolbar: false,
-                    hide_legend: false,
-                    save_image: false,
-                    studies: [
-                        "RSI@tv-basicstudies",
-                        "MACD@tv-basicstudies",
-                        "StochasticRSI@tv-basicstudies",
-                        "BB@tv-basicstudies"
-                    ],
-                    drawings_access: {
-                        type: 'black',
-                        tools: [
-                            { name: "Regression Trend" },
-                            { name: "Trend Angle" },
-                            { name: "Trend Line" },
-                            { name: "Horizontal Line" },
-                            { name: "Vertical Line" },
-                            { name: "Line" },
-                            { name: "Arrow" }
-                        ]
-                    }
+                const exchange = AppState.exchange || 'BINANCE';
+                const symbol = `${exchange}:${AppState.currentSymbol}`;
+                const interval = this.getTradingViewInterval(AppState.currentTimeframe || '60');
+                const theme = (AppState.currentTheme === 'dark') ? 'dark' : 'light';
+
+                console.log('Initializing TradingView with:', { symbol, interval, theme });
+
+                // Создаем виджет
+                const widget = new TradingView.widget({
+                  symbol: symbol,
+                  interval: interval,
+                  container_id: 'tradingview-chart',
+                  autosize: true,
+                  locale: AppState.lang || 'ru',
+                  timezone: 'Europe/Moscow',
+                  theme: theme,
+                  style: '1',
+                  toolbar_bg: (theme === 'dark') ? '#0b0f16' : '#f1f3f6',
+                  enable_publishing: false,
+                  allow_symbol_change: true,
+                  hide_top_toolbar: false,
+                  hide_side_toolbar: false,
+                  hide_legend: false,
+                  save_image: false,
+                  studies: [
+                    'RSI@tv-basicstudies',
+                    'MACD@tv-basicstudies',
+                    'StochasticRSI@tv-basicstudies',
+                    'BB@tv-basicstudies',
+                    'Volume@tv-basicstudies'
+                  ],
+                  drawings_access: {
+                    type: 'all',
+                    tools: [
+                      { name: 'Regression Trend' },
+                      { name: 'Trend Angle' },
+                      { name: 'Trend Line' },
+                      { name: 'Horizontal Line' },
+                      { name: 'Vertical Line' },
+                      { name: 'Line' },
+                      { name: 'Arrow' }
+                    ]
+                  },
+                  overrides: {
+                    "paneProperties.background": theme === 'dark' ? "#131722" : "#FFFFFF",
+                    "paneProperties.vertGridProperties.color": theme === 'dark' ? "#363c4e" : "#E0E3EB",
+                    "paneProperties.horzGridProperties.color": theme === 'dark' ? "#363c4e" : "#E0E3EB",
+                    "mainSeriesProperties.candleStyle.upColor": theme === 'dark' ? "#26a69a" : "#089981",
+                    "mainSeriesProperties.candleStyle.downColor": theme === 'dark' ? "#ef5350" : "#f23645",
+                    "mainSeriesProperties.candleStyle.wickUpColor": theme === 'dark' ? "#26a69a" : "#089981",
+                    "mainSeriesProperties.candleStyle.wickDownColor": theme === 'dark' ? "#ef5350" : "#f23645"
+                  },
+                  loading_screen: {
+                    backgroundColor: theme === 'dark' ? "#131722" : "#FFFFFF"
+                  },
+                  disabled_features: [
+                    "header_widget_dom_node",
+                    "header_compare",
+                    "header_interval_dialog_button",
+                    "show_interval_dialog_on_key_press"
+                  ],
+                  enabled_features: [
+                    "study_templates",
+                    "move_logo_to_main_pane",
+                    "side_toolbar_in_fullscreen_mode"
+                  ]
                 });
+
+                // Обработчик готовности графика
+                widget.onChartReady(() => {
+                  console.log('TradingView chart ready');
+                  AppState.tradingViewWidget = widget;
+
+                  // Сохраняем ссылку на график
+                  const chart = widget.chart();
+
+                  // Подписка на события изменения символа
+                  chart.onSymbolChanged().subscribe(
+                    null,
+                    (symbolName) => {
+                      console.log('Symbol changed to:', symbolName);
+                      const symbolParts = symbolName.split(':');
+                      if (symbolParts.length > 1 && symbolParts[1] !== AppState.currentSymbol) {
+                        AppState.currentSymbol = symbolParts[1];
+                        this.handleSymbolChange(symbolParts[1]);
+                      }
+                    }
+                  );
+
+                  // Подписка на события изменения интервала
+                  chart.onIntervalChanged().subscribe(
+                    null,
+                    (newInterval) => {
+                      console.log('Interval changed to:', newInterval);
+                      const mappedInterval = this.mapFromTradingViewInterval(newInterval);
+                      if (mappedInterval && mappedInterval !== AppState.currentTimeframe) {
+                        AppState.currentTimeframe = mappedInterval;
+                        this.handleTimeframeChange(mappedInterval);
+                      }
+                    }
+                  );
+
+                  // Диспетчеризуем событие готовности
+                  this.dispatchEvent('tradingview:ready', { widget, chart });
+                });
+
+                // Обработчик ошибок
+                widget.onError((error) => {
+                  console.error('TradingView widget error:', error);
+                  this.showTradingViewFallback();
+                });
+
+                return widget;
+
+              } catch (error) {
+                console.error('TradingView initialization error:', error);
+                this.showTradingViewFallback();
+                return null;
+              }
+            }
+
+            // Вспомогательные методы для работы с интервалами
+            static getTradingViewInterval(interval) {
+              const intervalMap = {
+                '1': '1',
+                '5': '5',
+                '15': '15',
+                '30': '30',
+                '60': '60',
+                '240': '240',
+                'D': '1D',
+                'W': '1W',
+                'M': '1M'
+              };
+              return intervalMap[interval] || '60';
+            }
+
+            static mapFromTradingViewInterval(tvInterval) {
+              const reverseMap = {
+                '1': '1',
+                '5': '5',
+                '15': '15',
+                '30': '30',
+                '60': '60',
+                '240': '240',
+                '1D': 'D',
+                '1W': 'W',
+                '1M': 'M'
+              };
+              return reverseMap[tvInterval] || '60';
+            }
+
+            // Обработчики изменений
+            static handleSymbolChange(newSymbol) {
+              console.log('Handling symbol change to:', newSymbol);
+              // Обновляем URL без перезагрузки страницы
+              const newUrl = `${window.location.pathname}?symbol=${newSymbol}&timeframe=${AppState.currentTimeframe}`;
+              window.history.replaceState(null, '', newUrl);
+
+              // Обновляем заголовок
+              document.getElementById('current-symbol').textContent = newSymbol;
+              document.getElementById('symbol-header').textContent = `Анализ ${newSymbol}`;
+
+              // Перезагружаем данные
+              this.refreshData();
+            }
+
+            static handleTimeframeChange(newTimeframe) {
+              console.log('Handling timeframe change to:', newTimeframe);
+              // Обновляем активную кнопку таймфрейма
+              document.querySelectorAll('.timeframe-buttons .btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.tf === newTimeframe) {
+                  btn.classList.add('active');
+                }
+              });
+
+              // Перезагружаем данные
+              this.refreshData();
+            }
+
+            // Fallback для случая когда TradingView не доступен
+            static showTradingViewFallback() {
+              const chartContainer = document.getElementById('tradingview-chart');
+              if (chartContainer) {
+                chartContainer.innerHTML = `
+                  <div class="chart-fallback">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h4>График TradingView временно недоступен</h4>
+                    <p>Попробуйте обновить страницу или проверьте подключение к интернету</p>
+                    <button onclick="UI.initTradingView()" class="btn btn-primary">
+                      <i class="fas fa-sync-alt"></i> Попробовать снова
+                    </button>
+                  </div>
+                `;
+              }
+            }
+
+            // Вспомогательный метод для диспетчеризации событий
+            static dispatchEvent(eventName, detail = {}) {
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent(eventName, { detail }));
+              }
             }
 
             static startAutoRefresh() {

@@ -1,5 +1,6 @@
 /* ===== VARIABLES & RESET ===== */
 :root {
+  --header-bg-rgb: 18, 18, 18;
   /* Цветовая схема - темная тема */
   --bg-primary: #0f172a;
   --bg-secondary: #1e293b;
@@ -53,6 +54,7 @@
 
 /* Light theme variables */
 [data-theme="light"] {
+  --header-bg-rgb: 255, 255, 255;
   --bg-primary: #f8fafc;
   --bg-secondary: #ffffff;
   --bg-tertiary: #f1f5f9;
@@ -126,7 +128,7 @@ a:hover {
   padding: var(--space-lg);
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  /*min-height: 100vh;*/
 }
 
 .main-content {
@@ -1063,4 +1065,36 @@ a:hover {
   font-size: 3rem;
   margin-bottom: var(--space-md);
   opacity: 0.5;
+}
+
+
+.chart-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  text-align: center;
+  padding: 20px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.chart-fallback i {
+  font-size: 48px;
+  color: var(--accent-warning);
+  margin-bottom: 16px;
+}
+
+.chart-fallback h4 {
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.chart-fallback p {
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+  font-size: 14px;
 }
