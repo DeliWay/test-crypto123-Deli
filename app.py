@@ -34,6 +34,12 @@ cache = Cache(config={
 })
 cache.init_app(app)
 
+# Проверка и удаление существующих endpoints если нужно
+if hasattr(app, 'view_functions'):
+    for endpoint in list(app.view_functions.keys()):
+        if endpoint in ['api_market_stats', 'api_historical_data']:
+            del app.view_functions[endpoint]
+
 # Настройка rate limiting
 limiter = Limiter(
     get_remote_address,
@@ -739,6 +745,72 @@ def api_symbols():
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/historical-data/<symbol>')
+@limiter.limit("20 per minute")
+@cache.cached(timeout=60)
+def api_historical_data(symbol):
+    """API для исторических данных"""
+    try:
+        timeframes = ['1', '4', '60', 'D']  # 1m, 4m, 1h, 1d
+        historical_data = []
+
+        for tf in timeframes:
+            market_data = crypto_api.get_market_data(symbol, tf, limit=50)
+            if market_data is not None and not market_data.empty:
+                latest = market_data.iloc[-1]
+                first = market_data.iloc[0]
+                price_change = ((float(latest['close']) - float(first['close'])) / float(first['close'])) * 100
+
+                historical_data.append({
+                    'timeframe': tf,
+                    'price': float(latest['close']),
+                    'change': round(price_change, 2)
+                })
+
+        return jsonify({
+            'success': True,
+            'symbol': symbol,
+            'historical_data': historical_data,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Error in historical data: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/market-statistics/<symbol>')  # Измените имя чтобы избежать конфликта
+@limiter.limit("20 per minute")
+@cache.cached(timeout=30)
+def api_market_statistics(symbol):  # Измените имя функции
+    """API для рыночной статистики"""
+    try:
+        ticker_info = crypto_api.get_ticker_info(symbol)
+        if not ticker_info:
+            return jsonify({'success': False, 'error': 'No data'}), 404
+
+        return jsonify({
+            'success': True,
+            'symbol': symbol,
+            'volume_24h': ticker_info.get('volume24h', 0),
+            'high_24h': ticker_info.get('highPrice24h', 0),
+            'low_24h': ticker_info.get('lowPrice24h', 0),
+            'price_change': ticker_info.get('price24hPcnt', 0) * 100 if ticker_info.get('price24hPcnt') else 0,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Error in market stats: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+def calculate_price_change(self, df):
+    """Расчет изменения цены за период"""
+    if len(df) < 2:
+        return 0
+    first_price = float(df.iloc[0]['close'])
+    last_price = float(df.iloc[-1]['close'])
+    return ((last_price - first_price) / first_price) * 100
 
 
 @app.route('/api/analyze/<symbol>')
