@@ -17,7 +17,12 @@ from backend.bybit_client import ticker as bybit_ticker, klines as bybit_klines
 from analysis.signals import detect_signals
 from functools import wraps
 import threading
+import numpy as np
+from ml_analyzer import CryptoAnalyzer  # Мы создадим этот модуль
+from bybit_api import bybit_client
 
+# Глобальный анализатор
+analyzer = CryptoAnalyzer()
 # Настройка логирования
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
@@ -980,6 +985,81 @@ def health_check():
         }
     })
 
+#Анализ крипты
+@app.route('/ai-predictions')
+def ai_predictions():
+    """Страница с AI прогнозами"""
+    return render_template('ai-predictions.html')
+
+
+@app.route('/api/ai/analyze/<symbol>')
+def ai_analyze_symbol(symbol):
+    """API для анализа конкретной монеты"""
+    try:
+        timeframe = request.args.get('timeframe', '1h')
+        analysis = analyzer.analyze_symbol(symbol.upper(), timeframe)
+
+        if analysis:
+            return jsonify({
+                'success': True,
+                'analysis': analysis,
+                'timestamp': datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Analysis failed'
+            }), 400
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/ai/top-predictions')
+def ai_top_predictions():
+    """API для топ прогнозов"""
+    try:
+        symbols = ['BTCUSDT', 'ETHUSDT', 'DOGEUSDT', 'SOLUSDT', 'BNBUSDT']
+        timeframe = request.args.get('timeframe', '1h')
+
+        predictions = []
+        for symbol in symbols[:3]:  # Первые 3 монеты
+            analysis = analyzer.analyze_symbol(symbol, timeframe)
+            if analysis:
+                predictions.append(analysis)
+
+        return jsonify({
+            'success': True,
+            'predictions': predictions,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/ai/available-symbols')
+def ai_available_symbols():
+    """API для получения доступных символов"""
+    try:
+        symbols = bybit_client.get_spot_symbols('USDT')
+        return jsonify({
+            'success': True,
+            'symbols': symbols,
+            'count': len(symbols)
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.errorhandler(404)
 def not_found_error(error):

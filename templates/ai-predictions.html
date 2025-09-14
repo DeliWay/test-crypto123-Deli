@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Прогнозы - CryptoAnalyst Pro</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
+    <style>
+        .ml-2 {
+            margin-left: 0.5rem;
+        }
+
+        .refresh-controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+
+        .analysis-controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+        }
+        .text-center {
+            text-align: center;
+        }
+
+        .mt-3 {
+            margin-top: 1.5rem;
+        }
+
+        .ai-predictions-section {
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .predictions-header {
+            text-align: center;
+            margin-bottom: 3rem;
+            background: var(--bg-secondary);
+            padding: 2rem;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .ai-icon {
+            font-size: 4rem;
+            color: #6366f1;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .control-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+            background: var(--bg-secondary);
+            padding: 2rem;
+            border-radius: 15px;
+            border: 1px solid var(--border-color);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .control-label {
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .symbol-selector, .timeframe-selector {
+            padding: 0.8rem 1rem;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: var(--transition-smooth);
+        }
+
+        .symbol-selector:focus, .timeframe-selector:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .analyze-btn {
+            padding: 1rem 2rem;
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .analyze-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .analyze-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .predictions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .prediction-card {
+            background: var(--bg-secondary);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid var(--border-color);
+            transition: var(--transition-smooth);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .prediction-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+        }
+
+        .prediction-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--card-shadow);
+        }
+
+        .crypto-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .crypto-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .crypto-info {
+            flex-grow: 1;
+        }
+
+        .crypto-info h3 {
+            margin: 0;
+            color: var(--text-primary);
+            font-size: 1.4rem;
+        }
+
+        .crypto-symbol {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        .timeframe-badge {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .prediction-data {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .data-item {
+            background: var(--bg-tertiary);
+            padding: 1rem;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .data-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .data-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--text-primary);
+        }
+
+        .prediction-positive { color: var(--accent-success); }
+        .prediction-negative { color: var(--accent-error); }
+        .prediction-neutral { color: var(--accent-warning); }
+
+        .confidence-meter {
+            height: 8px;
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 1rem 0;
+            position: relative;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            position: relative;
+        }
+
+        .confidence-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 100%);
+        }
+
+        .confidence-high { background: var(--accent-success); }
+        .confidence-medium { background: var(--accent-warning); }
+        .confidence-low { background: var(--accent-error); }
+
+        .prediction-signal {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.8rem 1.5rem;
+            border-radius: 25px;
+            font-weight: bold;
+            margin-top: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .signal-buy {
+            background: var(--accent-success);
+            color: white;
+        }
+
+        .signal-sell {
+            background: var(--accent-error);
+            color: white;
+        }
+
+        .signal-hold {
+            background: var(--accent-warning);
+            color: white;
+        }
+
+        .signal-strong-buy {
+            background: linear-gradient(135deg, var(--accent-success), #10b981);
+            color: white;
+        }
+
+        .signal-strong-sell {
+            background: linear-gradient(135deg, var(--accent-error), #ef4444);
+            color: white;
+        }
+
+        .analysis-details {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            font-size: 0.9rem;
+        }
+
+        .detail-label {
+            color: var(--text-secondary);
+        }
+
+        .detail-value {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .risk-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .risk-high { background: var(--accent-error); color: white; }
+        .risk-medium { background: var(--accent-warning); color: black; }
+        .risk-low { background: var(--accent-success); color: white; }
+
+        .loading-container, .error-container {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+            background: var(--bg-secondary);
+            border-radius: 15px;
+            border: 1px solid var(--border-color);
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top: 3px solid var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-container i {
+            font-size: 3rem;
+            color: var(--accent-error);
+            margin-bottom: 1rem;
+        }
+
+        .disclaimer-box {
+            background: var(--bg-tertiary);
+            border: 2px solid var(--accent-warning);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-top: 3rem;
+            text-align: center;
+        }
+
+        .disclaimer-icon {
+            color: var(--accent-warning);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .disclaimer-box h3 {
+            color: var(--accent-warning);
+            margin-bottom: 1rem;
+        }
+
+        .refresh-controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--bg-secondary);
+            padding: 0.8rem 1.5rem;
+            border-radius: 25px;
+            border: 1px solid var(--border-color);
+        }
+
+        @media (max-width: 768px) {
+            .predictions-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .control-panel {
+                grid-template-columns: 1fr;
+            }
+
+            .prediction-data {
+                grid-template-columns: 1fr;
+            }
+
+            .crypto-header {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+
+        .quality-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .quality-excellent { background: var(--accent-success); color: white; }
+        .quality-good { background: var(--accent-warning); color: black; }
+        .quality-fair { background: var(--accent-error-light); color: var(--text-primary); }
+
+        .signal-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+
+        .signal-tag {
+            background: var(--bg-tertiary);
+            padding: 0.3rem 0.8rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .signal-tag.positive { border-left: 3px solid var(--accent-success); }
+        .signal-tag.negative { border-left: 3px solid var(--accent-error); }
+        .signal-tag.neutral { border-left: 3px solid var(--accent-warning); }
+    </style>
+</head>
+<body>
+    <!-- Main Header -->
+    <header class="crypto-header">
+        <div class="header-content">
+            <div class="logo-container">
+                <a href="/" class="logo-link">
+                    <div class="logo">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="logo-text">
+                        <h1 class="logo-title">CryptoAnalyst Pro</h1>
+                        <div class="logo-subtitle">AI Прогнозы</div>
+                    </div>
+                </a>
+            </div>
+
+            <div class="header-nav">
+                <a href="/" class="nav-item">
+                    <div class="nav-icon">
+                        <i class="fas fa-home"></i>
+                    </div>
+                    <span class="nav-text">Главная</span>
+                </a>
+
+                <a href="/patterns" class="nav-item">
+                    <div class="nav-icon">
+                        <i class="fas fa-book"></i>
+                    </div>
+                    <span class="nav-text">Паттерны</span>
+                </a>
+
+                <a href="/dashboard" class="nav-item">
+                    <div class="nav-icon">
+                        <i class="fas fa-tachometer-alt"></i>
+                    </div>
+                    <span class="nav-text">Дашборд</span>
+                </a>
+
+                <a href="/ai-predictions" class="nav-item active">
+                    <div class="nav-icon">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <span class="nav-text">AI Прогнозы</span>
+                </a>
+            </div>
+
+            <div class="header-top-bar">
+                <div class="lang-selector">
+                    <span data-i18n="language">Язык:</span>
+                    <select id="langSwitcher">
+                        <option value="ru">RU</option>
+                        <option value="en">EN</option>
+                    </select>
+                </div>
+                <button type="button" class="theme-toggle-btn" id="header-theme-toggle">
+                    <i class="fas fa-moon"></i>
+                    <span data-i18n="theme">Тема</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <main class="ai-predictions-section">
+            <!-- Header -->
+            <div class="predictions-header">
+                <div class="ai-icon">
+                    <i class="fas fa-brain"></i>
+                </div>
+                <h1>AI Анализ рынка в реальном времени</h1>
+                <p>Профессиональный технический анализ на основе машинного обучения и данных Bybit</p>
+            </div>
+
+            <!-- Control Panel -->
+            <div class="control-panel">
+                <div class="control-group">
+                    <label class="control-label">
+                        <i class="fas fa-coins"></i>
+                        Выберите криптовалюту:
+                    </label>
+                    <select id="symbol-selector" class="symbol-selector">
+                        <option value="">Загрузка символов...</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label class="control-label">
+                        <i class="fas fa-clock"></i>
+                        Таймфрейм анализа:
+                    </label>
+                    <select id="timeframe-selector" class="timeframe-selector">
+                        <option value="15">15 минут</option>
+                        <option value="60" selected>1 час</option>
+                        <option value="240">4 часа</option>
+                        <option value="1440">1 день</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label class="control-label">
+                        <i class="fas fa-bolt"></i>
+                        Действие:
+                    </label>
+                    <button id="analyze-btn" class="analyze-btn" disabled>
+                        <i class="fas fa-play"></i> Запустить анализ
+                    </button>
+                </div>
+            </div>
+
+            <!-- Refresh Controls -->
+            <div class="refresh-controls">
+                <button id="refresh-btn" class="btn btn-primary">
+                    <i class="fas fa-sync"></i> Обновить прогнозы
+                </button>
+                <label class="auto-refresh">
+                    <input type="checkbox" id="auto-refresh" checked>
+                    <span>Автообновление (30 сек)</span>
+                </label>
+            </div>
+
+            <!-- Predictions Grid -->
+            <div id="predictions-container">
+                <div class="loading-container">
+                    <div class="loading-spinner"></div>
+                    <p>AI анализирует рынок. Получаем данные с Bybit...</p>
+                </div>
+            </div>
+
+            <!-- Disclaimer -->
+            <div class="disclaimer-box">
+                <div class="disclaimer-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h3>Важное предупреждение</h3>
+                <p>AI прогнозы основаны на исторических данных и алгоритмах машинного обучения.
+                Это не инвестиционная рекомендация. Криптовалютные рынки крайне волатильны.
+                Всегда проводите собственное исследование (DYOR) и торгуйте на свой риск.</p>
+            </div>
+        </main>
+
+        <footer class="main-footer">
+            <div class="footer-content">
+                <p>&copy; 2025 CryptoAnalyst Pro | AI аналитическая платформа</p>
+                <p class="disclaimer">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Для образовательных целей. Торгуйте осторожно, криптовалюты - высокорисковые активы.
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Инициализация темы
+        initTheme();
+
+        // Загрузка доступных символов
+        loadAvailableSymbols();
+
+        // Загрузка топ прогнозов
+        loadTopPredictions();
+
+        // Инициализация обработчиков
+        initEventHandlers();
+
+        // Запуск автообновления
+        startAutoRefresh();
+    });
+
+    let autoRefreshInterval = null;
+    let currentView = 'top'; // 'top' или 'single'
+    let currentSymbol = '';
+
+    async function loadAvailableSymbols() {
+        try {
+            const response = await fetch('/api/ai/available-symbols');
+            const data = await response.json();
+
+            if (data.success) {
+                populateSymbolSelector(data.symbols);
+                document.getElementById('analyze-btn').disabled = false;
+            } else {
+                showError('Не удалось загрузить список символов');
+            }
+        } catch (error) {
+            console.error('Error loading symbols:', error);
+            showError('Ошибка сети при загрузке символов');
+        }
+    }
+
+    function populateSymbolSelector(symbols) {
+        const selector = document.getElementById('symbol-selector');
+        selector.innerHTML = '<option value="">Выберите криптовалюту...</option>';
+
+        // Топ символы сначала
+        const topSymbols = ['BTCUSDT', 'ETHUSDT', 'DOGEUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT'];
+
+        topSymbols.forEach(symbol => {
+            if (symbols.includes(symbol)) {
+                const option = document.createElement('option');
+                option.value = symbol;
+                option.textContent = symbol;
+                option.selected = true;
+                selector.appendChild(option);
+            }
+        });
+
+        // Остальные символы
+        symbols.filter(symbol => !topSymbols.includes(symbol)).forEach(symbol => {
+            const option = document.createElement('option');
+            option.value = symbol;
+            option.textContent = symbol;
+            selector.appendChild(option);
+        });
+    }
+
+        async function loadTopPredictions(timeframe = '60') {
+        try {
+            showLoadingState();
+            currentView = 'top';
+            currentSymbol = '';
+
+            const response = await fetch(`/api/ai/top-predictions?timeframe=${timeframe}`);
+            const data = await response.json();
+
+            if (data.success) {
+                renderPredictions(data.predictions);
+            } else {
+                showError('Не удалось загрузить прогнозы: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error loading predictions:', error);
+            showError('Ошибка сети при загрузке прогнозов');
+        }
+    }
+
+    async function analyzeCustomSymbol() {
+        const symbol = document.getElementById('symbol-selector').value;
+        const timeframe = document.getElementById('timeframe-selector').value;
+
+        if (!symbol) {
+            alert('Пожалуйста, выберите криптовалюту для анализа');
+            return;
+        }
+
+        try {
+            showLoadingState();
+            currentView = 'single';
+            currentSymbol = symbol;
+
+            const response = await fetch(`/api/ai/analyze/${symbol}?timeframe=${timeframe}`);
+            const data = await response.json();
+
+            if (data.success) {
+                renderSinglePrediction(data.analysis);
+            } else {
+                showError('Анализ не удался: ' + (data.error || 'Unknown error'));
+                // Возвращаемся к списку при ошибке
+                setTimeout(() => loadTopPredictions(timeframe), 2000);
+            }
+        } catch (error) {
+            console.error('Error analyzing symbol:', error);
+            showError('Ошибка при анализе символа');
+            setTimeout(() => loadTopPredictions(timeframe), 2000);
+        }
+    }
+
+    function renderSinglePrediction(analysis) {
+    const container = document.getElementById('predictions-container');
+    container.innerHTML = `
+        <div class="prediction-card">
+            <div class="crypto-header">
+                <div class="crypto-icon">
+                    <i class="fab fa-${getCryptoIcon(analysis.symbol)}"></i>
+                </div>
+                <div class="crypto-info">
+                    <h3>${getCryptoName(analysis.symbol)}</h3>
+                    <div class="crypto-symbol">${analysis.symbol}</div>
+                </div>
+                <span class="timeframe-badge">${getTimeframeName(analysis.timeframe)}</span>
+            </div>
+
+            <div class="prediction-data">
+                <div class="data-item">
+                    <div class="data-label">Текущая цена</div>
+                    <div class="data-value">$${formatPrice(analysis.current_price)}</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">Цель</div>
+                    <div class="data-value prediction-${analysis.prediction.predicted_change_percent >= 0 ? 'positive' : 'negative'}">
+                        $${formatPrice(analysis.prediction.target_price)}
+                    </div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">Изменение</div>
+                    <div class="data-value prediction-${analysis.prediction.predicted_change_percent >= 0 ? 'positive' : 'negative'}">
+                        ${analysis.prediction.predicted_change_percent >= 0 ? '+' : ''}${analysis.prediction.predicted_change_percent}%
+                    </div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">Качество анализа</div>
+                    <div class="data-value">
+                        <span class="quality-badge quality-${analysis.analysis_quality.rating}">
+                            ${analysis.analysis_quality.rating === 'excellent' ? 'Отличное' :
+                              analysis.analysis_quality.rating === 'good' ? 'Хорошее' : 'Удовл.'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="confidence-meter">
+                <div class="confidence-fill confidence-${getConfidenceLevel(analysis.signals.confidence)}"
+                     style="width: ${analysis.signals.confidence * 100}%"></div>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Уверенность модели:</span>
+                <span class="detail-value">${getConfidenceText(analysis.signals.confidence)}</span>
+            </div>
+
+            <div class="signal-grid">
+                ${analysis.signals.signals.map(signal => `
+                    <div class="signal-tag ${getSignalType(signal)}">
+                        ${formatSignal(signal)}
+                    </div>
+                `).join('')}
+            </div>
+
+            <div class="prediction-signal signal-${analysis.signals.final_signal.toLowerCase().replace('strong_', '').split('_')[0]}">
+                <i class="fas fa-${analysis.signals.final_signal.toLowerCase().includes('buy') ? 'arrow-up' : 'arrow-down'}"></i>
+                ${getSignalText(analysis.signals.final_signal)}
+            </div>
+
+            <div class="analysis-details">
+                <div class="detail-item">
+                    <span class="detail-label">Стоп-лосс:</span>
+                    <span class="detail-value">$${formatPrice(analysis.prediction.stop_loss)}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Тейк-профит:</span>
+                    <span class="detail-value">$${formatPrice(analysis.prediction.take_profit)}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Риск:</span>
+                    <span class="detail-value">
+                        <span class="risk-badge risk-${analysis.prediction.risk_level}">
+                            ${analysis.prediction.risk_level === 'high' ? 'Высокий' :
+                              analysis.prediction.risk_level === 'medium' ? 'Средний' : 'Низкий'}
+                        </span>
+                    </span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Горизонт:</span>
+                    <span class="detail-value">${analysis.prediction.time_horizon}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Точки данных:</span>
+                    <span class="detail-value">${analysis.analysis_quality.data_points}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Волатильность:</span>
+                    <span class="detail-value">${(analysis.analysis_quality.volatility * 100).toFixed(2)}%</span>
+                </div>
+            </div>
+
+            <div class="text-center mt-3">
+                <button class="btn btn-outline" onclick="loadTopPredictions()">
+                    <i class="fas fa-arrow-left"></i> Вернуться к списку
+                </button>
+                <button class="btn btn-primary ml-2" onclick="refreshCurrentAnalysis()">
+                    <i class="fas fa-sync"></i> Обновить анализ
+                </button>
+
+            </div>
+        </div>
+    `;
+}
+
+// Обновим функцию showDetailedAnalysis чтобы она использовала analyzeCustomSymbol
+function showDetailedAnalysis(symbol) {
+    // Устанавливаем выбранный символ и запускаем анализ
+    document.getElementById('symbol-selector').value = symbol;
+    analyzeCustomSymbol();
+}
+
+    function renderPredictions(predictions) {
+        const container = document.getElementById('predictions-container');
+        if (!predictions || predictions.length === 0) {
+            container.innerHTML = `
+                <div class="error-container">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Нет данных для отображения</p>
+                    <button class="btn btn-outline btn-sm mt-2" onclick="document.getElementById('symbol-selector').value='${prediction.symbol}'; analyzeCustomSymbol()">
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = predictions.map(prediction => `
+            <div class="prediction-card">
+                <div class="crypto-header">
+                    <div class="crypto-icon">
+                        <i class="fab fa-${getCryptoIcon(prediction.symbol)}"></i>
+                    </div>
+                    <div class="crypto-info">
+                        <h3>${getCryptoName(prediction.symbol)}</h3>
+                        <div class="crypto-symbol">${prediction.symbol}</div>
+                    </div>
+                    <span class="timeframe-badge">${getTimeframeName(prediction.timeframe)}</span>
+                </div>
+
+                <div class="prediction-data">
+                    <div class="data-item">
+                        <div class="data-label">Текущая цена</div>
+                        <div class="data-value">$${formatPrice(prediction.current_price)}</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Цель</div>
+                        <div class="data-value prediction-${prediction.prediction.predicted_change_percent >= 0 ? 'positive' : 'negative'}">
+                            $${formatPrice(prediction.prediction.target_price)}
+                        </div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Изменение</div>
+                        <div class="data-value prediction-${prediction.prediction.predicted_change_percent >= 0 ? 'positive' : 'negative'}">
+                            ${prediction.prediction.predicted_change_percent >= 0 ? '+' : ''}${prediction.prediction.predicted_change_percent}%
+                        </div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Качество анализа</div>
+                        <div class="data-value">
+                            <span class="quality-badge quality-${prediction.analysis_quality.rating}">
+                                ${prediction.analysis_quality.rating === 'excellent' ? 'Отличное' :
+                                  prediction.analysis_quality.rating === 'good' ? 'Хорошее' : 'Удовл.'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="confidence-meter">
+                    <div class="confidence-fill confidence-${getConfidenceLevel(prediction.signals.confidence)}"
+                         style="width: ${prediction.signals.confidence * 100}%"></div>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Уверенность модели:</span>
+                    <span class="detail-value">${getConfidenceText(prediction.signals.confidence)}</span>
+                </div>
+
+                <div class="signal-grid">
+                    ${prediction.signals.signals.map(signal => `
+                        <div class="signal-tag ${getSignalType(signal)}">
+                            ${formatSignal(signal)}
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div class="prediction-signal signal-${prediction.signals.final_signal.toLowerCase().replace('strong_', '').split('_')[0]}">
+                    <i class="fas fa-${prediction.signals.final_signal.toLowerCase().includes('buy') ? 'arrow-up' : 'arrow-down'}"></i>
+                    ${getSignalText(prediction.signals.final_signal)}
+                </div>
+
+                <div class="analysis-details">
+                    <div class="detail-item">
+                        <span class="detail-label">Стоп-лосс:</span>
+                        <span class="detail-value">$${formatPrice(prediction.prediction.stop_loss)}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Тейк-профит:</span>
+                        <span class="detail-value">$${formatPrice(prediction.prediction.take_profit)}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Риск:</span>
+                        <span class="detail-value">
+                            <span class="risk-badge risk-${prediction.prediction.risk_level}">
+                                ${prediction.prediction.risk_level === 'high' ? 'Высокий' :
+                                  prediction.prediction.risk_level === 'medium' ? 'Средний' : 'Низкий'}
+                            </span>
+                        </span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Горизонт:</span>
+                        <span class="detail-value">${prediction.prediction.time_horizon}</span>
+                    </div>
+                </div>
+                <button class="btn btn-outline btn-sm mt-2" onclick="analyzeSingleSymbol('${prediction.symbol}')">
+                    <i class="fas fa-chart-bar"></i> Детальный анализ
+                </button>
+            </div>
+        `).join('');
+    }
+
+    function getCryptoIcon(symbol) {
+        const icons = {
+            'BTC': 'bitcoin',
+            'ETH': 'ethereum',
+            'DOGE': 'dog',
+            'SOL': 'solana',
+            'BNB': 'binance',
+            'XRP': 'xrp',
+            'ADA': 'ada',
+            'MATIC': 'polygon',
+            'DOT': 'dot',
+            'LTC': 'litecoin'
+        };
+        const baseSymbol = symbol.replace('USDT', '');
+        return icons[baseSymbol] || 'coins';
+    }
+
+    function getCryptoName(symbol) {
+        const names = {
+            'BTCUSDT': 'Bitcoin',
+            'ETHUSDT': 'Ethereum',
+            'DOGEUSDT': 'Dogecoin',
+            'SOLUSDT': 'Solana',
+            'BNBUSDT': 'Binance Coin',
+            'XRPUSDT': 'Ripple',
+            'ADAUSDT': 'Cardano',
+            'MATICUSDT': 'Polygon',
+            'DOTUSDT': 'Polkadot',
+            'LTCUSDT': 'Litecoin'
+        };
+        return names[symbol] || symbol.replace('USDT', '');
+    }
+
+    function getTimeframeName(tf) {
+        const timeframes = {
+            '15': '15m',
+            '60': '1h',
+            '240': '4h',
+            '1440': '1D'
+        };
+        return timeframes[tf] || tf;
+    }
+
+    function formatPrice(price) {
+        if (price >= 1000) return price.toLocaleString('ru-RU', {maximumFractionDigits: 0});
+        if (price >= 1) return price.toLocaleString('ru-RU', {maximumFractionDigits: 2});
+        if (price >= 0.01) return price.toLocaleString('ru-RU', {maximumFractionDigits: 4});
+        return price.toLocaleString('ru-RU', {maximumFractionDigits: 6});
+    }
+
+    function getConfidenceLevel(confidence) {
+        if (confidence >= 0.8) return 'high';
+        if (confidence >= 0.6) return 'medium';
+        return 'low';
+    }
+
+    function getConfidenceText(confidence) {
+        if (confidence >= 0.8) return 'Высокая';
+        if (confidence >= 0.6) return 'Средняя';
+        return 'Низкая';
+    }
+
+    function getSignalType(signal) {
+        if (signal.includes('bullish') || signal.includes('buy') || signal.includes('oversold')) return 'positive';
+        if (signal.includes('bearish') || signal.includes('sell') || signal.includes('overbought')) return 'negative';
+        return 'neutral';
+    }
+
+    function formatSignal(signal) {
+        const signalMap = {
+            'rsi_oversold': 'RSI Перепроданность',
+            'rsi_overbought': 'RSI Перекупленность',
+            'macd_bullish': 'MACD Бычий',
+            'macd_bearish': 'MACD Медвежий',
+            'bb_oversold': 'BB Перепроданность',
+            'bb_overbought': 'BB Перекупленность',
+            'uptrend': 'Восходящий тренд',
+            'downtrend': 'Нисходящий тренд'
+        };
+        return signalMap[signal] || signal;
+    }
+
+    function getSignalText(signal) {
+        const signals = {
+            'STRONG_BUY': 'СИЛЬНАЯ ПОКУПКА',
+            'BUY': 'ПОКУПКА',
+            'NEUTRAL': 'НЕЙТРАЛЬНО',
+            'SELL': 'ПРОДАЖА',
+            'STRONG_SELL': 'СИЛЬНАЯ ПРОДАЖА'
+        };
+        return signals[signal] || signal;
+    }
+
+    function showLoadingState() {
+        const container = document.getElementById('predictions-container');
+        container.innerHTML = `
+            <div class="loading-container">
+                <div class="loading-spinner"></div>
+                <p>AI анализирует рынок. Получаем актуальные данные с Bybit...</p>
+            </div>
+        `;
+    }
+
+    function showError(message) {
+        const container = document.getElementById('predictions-container');
+        container.innerHTML = `
+            <div class="error-container">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>${message}</p>
+                <button class="btn btn-primary" onclick="loadTopPredictions()">
+                    <i class="fas fa-sync"></i> Попробовать снова
+                </button>
+            </div>
+        `;
+    }
+
+    function refreshCurrentAnalysis() {
+        if (currentView === 'single' && currentSymbol) {
+            analyzeCustomSymbol();
+        }
+    }
+
+    function initEventHandlers() {
+        // Кнопка анализа
+        document.getElementById('analyze-btn').addEventListener('click', analyzeCustomSymbol);
+
+        // Кнопка обновления
+        document.getElementById('refresh-btn').addEventListener('click', function() {
+            if (currentView === 'top') {
+                const timeframe = document.getElementById('timeframe-selector').value;
+                loadTopPredictions(timeframe);
+            } else if (currentView === 'single' && currentSymbol) {
+                analyzeCustomSymbol();
+            }
+        });
+
+        // Автообновление
+        document.getElementById('auto-refresh').addEventListener('change', function() {
+            if (this.checked) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        });
+    }
+
+    function startAutoRefresh() {
+        stopAutoRefresh();
+        autoRefreshInterval = setInterval(() => {
+            // Автообновляем только если мы в режиме списка
+            if (currentView === 'top') {
+                const timeframe = document.getElementById('timeframe-selector').value;
+                loadTopPredictions(timeframe);
+            }
+            // В режиме одиночного анализа не автообновляем
+        }, 30000); // 30 секунд
+    }
+
+    function stopAutoRefresh() {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+        }
+    }
+
+    function initTheme() {
+        const savedTheme = localStorage.getItem('cryptoanalyst_theme');
+        const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        const theme = savedTheme || systemTheme;
+        document.documentElement.setAttribute('data-theme', theme);
+    }
+    </script>
+</body>
+</html>
