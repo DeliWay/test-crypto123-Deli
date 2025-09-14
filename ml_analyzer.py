@@ -3,7 +3,7 @@ import numpy as np
 import talib.abstract as ta
 from datetime import datetime, timedelta
 import logging
-from bybit_api import bybit_client, get_ticker_info
+from backend.bybit_client import bybit_client, get_ticker_info
 import json
 
 logging.basicConfig(level=logging.INFO)
