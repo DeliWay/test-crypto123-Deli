@@ -13,8 +13,8 @@ import os
 import time
 from datetime import datetime, timedelta
 import traceback
-from backend.bybit_client import bybit_client, get_market_data_sync, get_ticker_info_sync, get_bybit_symbols_sync,init_bybit_client, close_bybit_client
-from analysis.signals import detect_signals
+from backend.bybit_client import bybit_client,klines, get_market_data_sync, get_ticker_info_sync, get_bybit_symbols_sync,init_bybit_client, close_bybit_client
+from analysis.analysis_engine import detect_signals_sync, analysis_engine
 from functools import wraps
 import threading
 import numpy as np
@@ -23,6 +23,8 @@ import asyncio
 
 # Глобальный анализатор
 analyzer = CryptoAnalyzer()
+
+
 # Настройка логирования
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
@@ -1070,13 +1072,18 @@ def not_found_error(error):
 def internal_error(error):
     return render_template('error.html', message="Внутренняя ошибка сервера"), 500
 
+
 # Альтернатива для новых версий Flask
 bybit_initialized = False
+analysis_initialized = False  # ← ДОБАВЬ ЭТУ ПЕРЕМЕННУЮ
+
 
 @app.before_request
 def initialize_bybit_client():
-    """Инициализация Bybit клиента при первом запросе"""
-    global bybit_initialized
+    """Инициализация всех сервисов при первом запросе"""
+    global bybit_initialized, analysis_initialized  # ← ДОБАВЬ analysis_initialized
+
+    # Инициализация Bybit клиента
     if not bybit_initialized:
         try:
             asyncio.run(init_bybit_client())
@@ -1085,14 +1092,32 @@ def initialize_bybit_client():
         except Exception as e:
             print(f"Failed to initialize Bybit client: {e}")
 
+    # Инициализация движка анализа ← ДОБАВЬ ЭТОТ БЛОК
+    if not analysis_initialized:
+        try:
+            asyncio.run(analysis_engine.init())
+            analysis_initialized = True
+            print("Analysis engine initialized successfully")
+        except Exception as e:
+            print(f"Failed to initialize analysis engine: {e}")
+
+
 @app.teardown_appcontext
 def shutdown_bybit_client(exception=None):
-    """Закрытие Bybit клиента при завершении приложения"""
+    """Закрытие всех сервисов при завершении приложения"""
+    # Закрытие Bybit клиента
     try:
         asyncio.run(close_bybit_client())
         print("Bybit client closed successfully")
     except Exception as e:
         print(f"Failed to close Bybit client: {e}")
+
+    # Закрытие движка анализа ← ДОБАВЬ ЭТОТ БЛОК
+    try:
+        asyncio.run(analysis_engine.close())
+        print("Analysis engine closed successfully")
+    except Exception as e:
+        print(f"Failed to close analysis engine: {e}")
 
 
 # === New additive API v5 endpoints ===
@@ -1114,23 +1139,38 @@ def api_klines():
         return ('', 204)
     return jsonify({"symbol": symbol, "interval": interval, "list": data})
 
+
 @app.route('/api/analysis')
 def api_analysis():
     symbol = request.args.get('symbol', 'BTCUSDT')
     interval = request.args.get('interval', '60')
     strategy = request.args.get('strategy', 'classic')
     limit = int(request.args.get('limit', '200'))
-    data = bybit_client.klines(symbol, interval, limit)
+
+    data = klines(symbol, interval, limit)
     if not data:
         return ('', 204)
+
     closes = [x["close"] for x in data]
-    res = detect_signals(closes, strategy=strategy)
+    res = detect_signals_sync(closes, strategy=strategy)
+
     N = 200
-    result = {"symbol": symbol, "interval": interval, "strategy": strategy, "ind": {}, "alerts": res['alerts'][-N:]}
-    # keep common keys safely if exist
-    for k in ['ema9','ema21','macd','macd_signal','macd_hist','rsi','bb_mid','bb_upper','bb_lower','stoch_k','stoch_d']:
+    result = {
+        "symbol": symbol,
+        "interval": interval,
+        "strategy": strategy,
+        "ind": {},
+        "alerts": res['alerts'][-N:],
+        "confidence": res.get('confidence', 0),
+        "strength": res.get('strength', 0)
+    }
+
+    # Сохраняем совместимость
+    for k in ['ema9', 'ema21', 'macd', 'macd_signal', 'macd_hist', 'rsi',
+              'bb_mid', 'bb_upper', 'bb_lower', 'stoch_k', 'stoch_d']:
         if k in res:
             result["ind"][k] = res[k][-N:]
+
     return jsonify(result)
 
 import io, csv

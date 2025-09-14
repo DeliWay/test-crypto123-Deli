@@ -1,57 +1,92 @@
-from typing import List, Dict, Any
-import math
+"""
+Минимальный модуль индикаторов для обратной совместимости
+Основной функционал перенесен в analysis_engine.py
+"""
 
-def ema(values: List[float], period: int) -> List[float]:
-    if period <= 0 or not values:
-        return []
-    k = 2/(period+1)
-    out: List[float] = []
-    ema_prev = None
-    for v in values:
-        if ema_prev is None:
-            ema_prev = v
+import numpy as np
+from typing import List, Optional, Dict, Any
+
+# Добавь этот импорт в начало analysis_engine.py
+from typing import List, Dict, Optional, Any
+
+def calculate_ema(prices: List[float], period: int = 9) -> List[float]:
+    """Расчет EMA (обертка для совместимости)"""
+    from .analysis_engine import calculate_indicators_sync
+    indicators = calculate_indicators_sync(prices)
+    return indicators.get(f'ema{period}', []) if period in [9, 21] else []
+
+def calculate_rsi(prices: List[float], period: int = 14) -> List[float]:
+    """Расчет RSI (обертка для совместимости)"""
+    from .analysis_engine import calculate_indicators_sync
+    indicators = calculate_indicators_sync(prices)
+    return indicators.get('rsi', [])
+
+def calculate_macd(prices: List[float]) -> Dict[str, List[float]]:
+    """Расчет MACD (обертка для совместимости)"""
+    from .analysis_engine import calculate_indicators_sync
+    indicators = calculate_indicators_sync(prices)
+    return {
+        'macd': indicators.get('macd', []),
+        'signal': indicators.get('macd_signal', []),
+        'histogram': indicators.get('macd_hist', [])
+    }
+
+def calculate_bollinger_bands(prices: List[float], period: int = 20) -> Dict[str, List[float]]:
+    """Расчет Bollinger Bands (обертка для совместимости)"""
+    from .analysis_engine import calculate_indicators_sync
+    indicators = calculate_indicators_sync(prices)
+    return {
+        'upper': indicators.get('bb_upper', []),
+        'middle': indicators.get('bb_mid', []),
+        'lower': indicators.get('bb_lower', [])
+    }
+
+def calculate_stochastic(high: List[float], low: List[float], close: List[float]) -> Dict[str, List[float]]:
+    """Расчет Stochastic (обертка для совместимости)"""
+    from .analysis_engine import calculate_indicators_sync
+    indicators = calculate_indicators_sync(close)
+    return {
+        'k': indicators.get('stoch_k', []),
+        'd': indicators.get('stoch_d', [])
+    }
+
+# Быстрые версии для отдельных расчетов
+def fast_ema(prices: np.ndarray, period: int) -> np.ndarray:
+    """Быстрый расчет EMA"""
+    alpha = 2 / (period + 1)
+    ema = np.zeros_like(prices)
+    ema[0] = prices[0]
+
+    for i in range(1, len(prices)):
+        ema[i] = alpha * prices[i] + (1 - alpha) * ema[i-1]
+
+    return ema
+
+def fast_rsi(prices: np.ndarray, period: int = 14) -> np.ndarray:
+    """Быстрый расчет RSI"""
+    deltas = np.diff(prices)
+    seed = deltas[:period+1]
+
+    up = seed[seed >= 0].sum() / period
+    down = -seed[seed < 0].sum() / period
+    rs = up / down if down != 0 else 0
+    rsi = np.zeros_like(prices)
+    rsi[:period] = 100 - 100 / (1 + rs)
+
+    for i in range(period, len(prices)):
+        delta = deltas[i-1]
+
+        if delta > 0:
+            up_val = delta
+            down_val = 0
         else:
-            ema_prev = v * k + ema_prev * (1-k)
-        out.append(ema_prev)
-    return out
+            up_val = 0
+            down_val = -delta
 
-def macd(values: List[float], fast: int = 12, slow: int = 26, signal: int = 9):
-    ema_fast = ema(values, fast)
-    ema_slow = ema(values, slow)
-    macd_line = [ (f - s) if (f is not None and s is not None) else None for f,s in zip(ema_fast, ema_slow) ]
-    # replace None by earliest valid
-    macd_line = [x if x is not None else (macd_line[i-1] if i>0 else 0.0) for i,x in enumerate(macd_line)]
-    signal_line = ema([x for x in macd_line], signal)
-    hist = [m - s for m, s in zip(macd_line, signal_line)]
-    return macd_line, signal_line, hist
+        up = (up * (period - 1) + up_val) / period
+        down = (down * (period - 1) + down_val) / period
 
-def rsi(values: List[float], period: int = 14) -> List[float]:
-    if len(values) < 2:
-        return []
-    gains = [0.0]
-    losses = [0.0]
-    for i in range(1, len(values)):
-        diff = values[i] - values[i-1]
-        gains.append(max(0.0, diff))
-        losses.append(max(0.0, -diff))
-    def _ema(seq, p):
-        return ema(seq, p)
-    avg_gain = _ema(gains, period)
-    avg_loss = _ema(losses, period)
-    out = []
-    for g,l in zip(avg_gain, avg_loss):
-        rs = (g / l) if l != 0 else float('inf')
-        rsi = 100 - (100 / (1 + rs)) if math.isfinite(rs) else 100.0
-        out.append(rsi)
-    return out
+        rs = up / down if down != 0 else 0
+        rsi[i] = 100 - 100 / (1 + rs)
 
-def atr(highs: List[float], lows: List[float], closes: List[float], period: int = 14) -> List[float]:
-    if not highs or not lows or not closes:
-        return []
-    trs = []
-    prev_close = closes[0]
-    for h,l,c in zip(highs, lows, closes):
-        tr = max(h - l, abs(h - prev_close), abs(l - prev_close))
-        trs.append(tr)
-        prev_close = c
-    return ema(trs, period)
+    return rsi
