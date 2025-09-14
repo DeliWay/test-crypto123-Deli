@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,34 +8,6 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/patterns.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
-    <style>
-        /* Дополнительные стили для исправления проблем с темой */
-        .patterns-hero {
-            background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-primary-dark) 100%);
-        }
-
-        [data-theme="light"] .patterns-hero {
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-        }
-
-        .pattern-icon {
-            background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-primary-dark) 100%);
-        }
-
-        .pattern-details-btn {
-            background: var(--accent-primary);
-        }
-
-        .pattern-details-btn:hover {
-            background: var(--accent-primary-dark);
-        }
-
-        .filter-btn.active,
-        .view-btn.active {
-            background: var(--accent-primary);
-            border-color: var(--accent-primary);
-        }
-    </style>
 </head>
 
 <body>
@@ -207,47 +179,49 @@
             // Инициализация модального окна
             initModal();
 
-            // Исправление темы - синхронизация с header
-            syncThemeWithHeader();
+            // Синхронизация темы с системой
+            initTheme();
         });
 
-        // Синхронизация темы с header
-        function syncThemeWithHeader() {
-            // Слушаем изменения темы из header
-            const themeToggle = document.querySelector('.theme-toggle-btn');
+        // Инициализация темы
+        function initTheme() {
+            // Проверяем сохраненную тему или используем системную
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+
+            // Синхронизируем с переключателем в header
+            const themeToggle = document.getElementById('header-theme-toggle');
             if (themeToggle) {
                 themeToggle.addEventListener('click', function() {
-                    // Принудительно обновляем страницу после смены темы
-                    setTimeout(() => {
-                        document.documentElement.setAttribute('data-theme',
-                            document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
-                    }, 100);
+                    const currentTheme = document.documentElement.getAttribute('data-theme');
+                    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', newTheme);
+                    localStorage.setItem('theme', newTheme);
+                    updateThemeStyles();
                 });
             }
 
-            // Проверяем текущую тему и применяем соответствующие стили
-            updateThemeStyles();
+            // Обновляем стили после загрузки
+            setTimeout(updateThemeStyles, 100);
         }
 
         // Обновление стилей темы
         function updateThemeStyles() {
             const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-            // Обновляем иконки в зависимости от темы
-            document.querySelectorAll('.stat-item i, .pattern-icon i').forEach(icon => {
-                icon.style.color = isDark ? 'white' : 'white'; // Белый для контраста на градиенте
-            });
-
-            // Обновляем текст в hero секции
-            document.querySelectorAll('.hero-content h1, .hero-description, .stat-item').forEach(el => {
-                el.style.color = 'white'; // Всегда белый текст на градиенте
-            });
+            // Обновляем иконку переключателя темы
+            const themeIcon = document.querySelector('.theme-toggle-btn i');
+            if (themeIcon) {
+                themeIcon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+            }
         }
 
         // Загрузка данных паттернов
         async function loadPatternsData() {
             try {
                 const container = document.getElementById('patterns-grid');
+
+                // Показываем состояние загрузки
                 container.innerHTML = `
                     <div class="loading-state">
                         <div class="loading-spinner"></div>
@@ -255,41 +229,15 @@
                     </div>
                 `;
 
-                // Используем фиктивные данные для демонстрации
-                allPatterns = [
-                    {
-                        id: 1,
-                        name: "Голова и плечи",
-                        type: "Разворотные",
-                        confidence: "Высокая",
-                        description: "Классический разворотный паттерн, состоящий из трех вершин.",
-                        signals: {
-                            entry: "После пробоя линии шеи",
-                            stop: "За правым плечом",
-                            target: "Высота паттерна от линии шеи"
-                        },
-                        features: ["Три вершины", "Средняя вершина выше", "Симметричные плечи"],
-                        tips: ["Дождитесь пробоя линии шеи", "Подтверждение объемом обязательно"],
-                        keyPoints: ["Четкая линия шеи", "Объем на пробое", "Симметрия плеч"]
-                    },
-                    // ... остальные паттерны (остаются без изменений)
-                    {
-                        id: 8,
-                        name: "Доджи",
-                        type: "Свечные",
-                        confidence: "Низкая",
-                        description: "Свеча с очень маленьким телом, указывающая на нерешительность рынка.",
-                        signals: {
-                            entry: "После подтверждения следующей свечой",
-                            stop: "За экстремумом доджи",
-                            target: "1-2 размера паттерна"
-                        },
-                        features: ["Маленькое тело", "Длинные тени", "Нерешительность"],
-                        tips: ["Требует сильного подтверждения", "Работает в контексте"],
-                        keyPoints: ["Маленькое тело", "Длинные тени", "На важном уровне"]
-                    }
-                ];
+                // Получаем данные паттернов через API
+                const response = await fetch('/api/patterns/cheatsheet');
+                if (!response.ok) {
+                    throw new Error('Ошибка загрузки данных');
+                }
 
+                allPatterns = await response.json();
+
+                // Рендерим паттерны
                 renderPatterns(allPatterns);
 
             } catch (error) {
@@ -345,80 +293,33 @@
                         <div class="pattern-body">
                             <p class="pattern-description">${pattern.description}</p>
 
-                            <div class="pattern-meta">
-                                <span class="pattern-reliability ${getConfidenceClass(pattern.confidence)}">
-                                    <i class="fas fa-star"></i>
-                                    <span class="reliability-text">${pattern.confidence}</span>
-                                </span>
-                                <span class="pattern-trend">
-                                    <i class="fas ${pattern.type === 'Продолжения' ? 'fa-arrow-right' : 'fa-exchange-alt'}"></i>
-                                    <span class="trend-direction">${getTrendDirection(pattern.type)}</span>
-                                </span>
+                            <div class="pattern-confidence">
+                                <span class="confidence-label">Надежность:</span>
+                                <div class="confidence-bar">
+                                    <div class="confidence-fill ${getConfidenceClass(pattern.reliability)}"
+                                         style="width: ${getConfidenceWidth(pattern.reliability)}%">
+                                    </div>
+                                </div>
+                                <span class="confidence-text">${pattern.reliability}</span>
+                            </div>
+
+                            <div class="pattern-features">
+                                ${pattern.keyPoints.slice(0, 3).map(point => `
+                                    <span class="feature-tag">
+                                        <i class="fas fa-check-circle"></i> ${point}
+                                    </span>
+                                `).join('')}
                             </div>
                         </div>
 
-                        <div class="pattern-actions">
-                            <button class="pattern-details-btn" onclick="showPatternDetails(${pattern.id})">
+                        <div class="pattern-footer">
+                            <button class="pattern-details-btn" onclick="openPatternModal('${pattern.name}')">
                                 <i class="fas fa-info-circle"></i> Подробнее
                             </button>
                         </div>
                     </div>
                 `;
             }).join('');
-
-            // Обновляем стили после рендеринга
-            updateThemeStyles();
-        }
-
-                // Получить паттерн по ID
-        function getPatternById(id) {
-            return allPatterns.find(pattern => pattern.id === id);
-        }
-
-        // Получить иконку для паттерна
-        function getPatternIcon(patternName) {
-            const iconMap = {
-                'Голова и плечи': 'fa-chart-line',
-                'Двойное дно': 'fa-chart-area',
-                'Треугольник': 'fa-play',
-                'Флаг': 'fa-flag',
-                'Вымпел': 'fa-chevron-down',
-                'Клин': 'fa-angle-double-up',
-                'Чашка с ручкой': 'fa-coffee',
-                'Бриллиант': 'fa-gem',
-                'Тройная вершина': 'fa-chart-bar',
-                'Молот': 'fa-gavel',
-                'Поглощение': 'fa-exchange-alt',
-                'Доджи': 'fa-balance-scale',
-                'default': 'fa-chart-line'
-            };
-
-            return iconMap[patternName] || iconMap.default;
-        }
-
-        // Получить класс для типа паттерна
-        function getPatternTypeClass(type) {
-            const classMap = {
-                'Разворотные': 'reversal',
-                'Продолжения': 'continuation',
-                'Свечные': 'candlestick'
-            };
-            return classMap[type] || 'default';
-        }
-
-        // Получить класс для надежности
-        function getConfidenceClass(confidence) {
-            const classMap = {
-                'Высокая': 'high',
-                'Средняя': 'medium',
-                'Низкая': 'low'
-            };
-            return classMap[confidence] || 'unknown';
-        }
-
-        // Получить направление тренда
-        function getTrendDirection(type) {
-            return type === 'Продолжения' ? 'Продолжение' : 'Разворот';
         }
 
         // Инициализация поиска и фильтров
@@ -448,24 +349,20 @@
                     this.classList.add('active');
                     const viewType = this.getAttribute('data-view');
                     const grid = document.getElementById('patterns-grid');
-                    if (viewType === 'list') {
-                        grid.classList.add('list-view');
-                    } else {
-                        grid.classList.remove('list-view');
-                    }
+                    grid.className = viewType === 'list' ? 'patterns-list' : 'patterns-grid';
                 });
             });
         }
 
         // Фильтрация паттернов
         function filterPatterns() {
-            const searchTerm = document.getElementById('pattern-search').value.toLowerCase();
+            const searchText = document.getElementById('pattern-search').value.toLowerCase();
             const activeFilter = document.querySelector('.filter-btn.active').getAttribute('data-filter');
 
             const filtered = allPatterns.filter(pattern => {
-                const matchesSearch = pattern.name.toLowerCase().includes(searchTerm) ||
-                                    pattern.description.toLowerCase().includes(searchTerm) ||
-                                    pattern.type.toLowerCase().includes(searchTerm);
+                const matchesSearch = pattern.name.toLowerCase().includes(searchText) ||
+                                    pattern.description.toLowerCase().includes(searchText) ||
+                                    pattern.type.toLowerCase().includes(searchText);
 
                 const matchesFilter = activeFilter === 'all' || pattern.type === activeFilter;
 
@@ -484,7 +381,7 @@
                     btn.classList.add('active');
                 }
             });
-            renderPatterns(allPatterns);
+            filterPatterns();
         }
 
         // Инициализация модального окна
@@ -492,113 +389,196 @@
             const modal = document.getElementById('pattern-modal');
             const closeBtn = document.getElementById('modal-close');
 
-            closeBtn.addEventListener('click', hidePatternDetails);
+            closeBtn.addEventListener('click', closeModal);
 
             modal.addEventListener('click', function(e) {
                 if (e.target === modal) {
-                    hidePatternDetails();
+                    closeModal();
                 }
             });
 
-            // Закрытие по ESC
             document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') {
-                    hidePatternDetails();
+                if (e.key === 'Escape' && modal.style.display === 'flex') {
+                    closeModal();
                 }
             });
         }
 
-        // Показать детали паттерна
-        function showPatternDetails(patternId) {
-            const pattern = getPatternById(patternId);
-            if (!pattern) return;
+        // Открытие модального окна с деталями паттерна
+        async function openPatternModal(patternName) {
+            try {
+                const modal = document.getElementById('pattern-modal');
+                const title = document.getElementById('modal-title');
+                const body = document.getElementById('modal-body');
 
-            const modal = document.getElementById('pattern-modal');
-            const title = document.getElementById('modal-title');
-            const body = document.getElementById('modal-body');
+                // Загрузка детальной информации о паттерне
+                const response = await fetch(`/api/patterns/${encodeURIComponent(patternName)}`);
+                if (!response.ok) {
+                    throw new Error('Ошибка загрузки данных паттерна');
+                }
 
-            title.textContent = pattern.name;
+                const pattern = await response.json();
 
-            body.innerHTML = `
-                <div class="pattern-detail">
-                    <div class="detail-header">
-                        <span class="pattern-type-badge ${getPatternTypeClass(pattern.type)}">
-                            ${pattern.type}
-                        </span>
-                        <span class="pattern-reliability ${getConfidenceClass(pattern.confidence)}">
-                            <i class="fas fa-star"></i>
-                            Надежность: ${pattern.confidence}
-                        </span>
-                    </div>
+                title.textContent = pattern.name;
 
-                    <div class="detail-description">
-                        <h4>Описание</h4>
-                        <p>${pattern.description}</p>
-                    </div>
+                const imageUrl = `/static/images/patterns/${pattern.name.toLowerCase().replace(/\s+/g, '_')}.svg`;
 
-                    <div class="detail-signals">
-                        <h4>Торговые сигналы</h4>
-                        <div class="signal-grid">
-                            <div class="signal-item">
-                                <i class="fas fa-play"></i>
-                                <strong>Вход:</strong> ${pattern.signals.entry}
-                            </div>
-                            <div class="signal-item">
-                                <i class="fas fa-shield-alt"></i>
-                                <strong>Стоп-лосс:</strong> ${pattern.signals.stop}
-                            </div>
-                            <div class="signal-item">
-                                <i class="fas fa-bullseye"></i>
-                                <strong>Цель:</strong> ${pattern.signals.target}
+                body.innerHTML = `
+                    <div class="modal-pattern-content">
+                        <div class="modal-header-info">
+                            <span class="pattern-type-badge ${getPatternTypeClass(pattern.type)}">
+                                ${pattern.type}
+                            </span>
+                            <span class="pattern-confidence-badge ${getConfidenceClass(pattern.reliability)}">
+                                <i class="fas ${getConfidenceIcon(pattern.reliability)}"></i>
+                                ${pattern.reliability}
+                            </span>
+                        </div>
+
+                        <div class="modal-visual">
+                            <img src="${imageUrl}" alt="${pattern.name}"
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                                 class="modal-pattern-image">
+                            <div class="modal-image-fallback" style="display: none;">
+                                <i class="fas fa-chart-line"></i>
+                                <span>${pattern.name}</span>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="detail-features">
-                        <h4>Ключевые особенности</h4>
-                        <ul>
-                            ${pattern.features.map(feature => `<li>${feature}</li>`).join('')}
-                        </ul>
-                    </div>
+                        <div class="modal-description">
+                            <h4>Описание</h4>
+                            <p>${pattern.description}</p>
+                        </div>
 
-                    <div class="detail-tips">
-                        <h4>Торговые советы</h4>
-                        <div class="tips-list">
-                            ${pattern.tips.map(tip => `
-                                <div class="tip-item">
-                                    <i class="fas fa-lightbulb"></i>
-                                    <span>${tip}</span>
+                        <div class="modal-trading-info">
+                            <div class="info-grid">
+                                <div class="info-item">
+                                    <i class="fas fa-trending-up"></i>
+                                    <strong>Тренд:</strong> ${pattern.trend}
                                 </div>
-                            `).join('')}
-                        </div>
-                    </div>
-
-                    <div class="detail-key-points">
-                        <h4>Важные моменты</h4>
-                        <div class="key-points-grid">
-                            ${pattern.keyPoints.map(point => `
-                                <div class="key-point-item">
+                                <div class="info-item">
+                                    <i class="fas fa-chart-bar"></i>
+                                    <strong>Объем:</strong> ${pattern.volume_characteristics}
+                                </div>
+                                <div class="info-item">
+                                    <i class="fas fa-bullseye"></i>
+                                    <strong>Цель:</strong> ${pattern.price_target}
+                                </div>
+                                <div class="info-item">
                                     <i class="fas fa-check-circle"></i>
-                                    <span>${point}</span>
+                                    <strong>Подтверждение:</strong> ${pattern.confirmation}
                                 </div>
-                            `).join('')}
+                            </div>
+                        </div>
+
+                        <div class="modal-features">
+                            <h4>Ключевые особенности</h4>
+                            <div class="features-list">
+                                ${pattern.keyPoints.map(point => `
+                                    <div class="feature-item">
+                                        <i class="fas fa-check"></i>
+                                        <span>${point}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <div class="modal-tips">
+                            <h4>Советы по торговле</h4>
+                            <div class="tips-list">
+                                ${pattern.trading_tips.map(tip => `
+                                    <div class="tip-item">
+                                        <i class="fas fa-lightbulb"></i>
+                                        <span>${tip}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <div class="modal-mistakes">
+                            <h4>Частые ошибки</h4>
+                            <div class="mistakes-list">
+                                ${pattern.common_mistakes.map(mistake => `
+                                    <div class="mistake-item">
+                                        <i class="fas fa-times-circle"></i>
+                                        <span>${mistake}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
+                `;
 
-            modal.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
+                modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+
+            } catch (error) {
+                console.error('Ошибка загрузки деталей паттерна:', error);
+                alert('Не удалось загрузить информацию о паттерне');
+            }
         }
 
-        // Скрыть детали паттерна
-        function hidePatternDetails() {
+        // Закрытие модального окна
+        function closeModal() {
             const modal = document.getElementById('pattern-modal');
             modal.style.display = 'none';
             document.body.style.overflow = 'auto';
         }
 
-        // Показать состояние ошибки
+        // Вспомогательные функции
+        function getPatternIcon(patternName) {
+            const icons = {
+                'Голова и плечи': 'fa-user-friends',
+                'Двойная вершина': 'fa-mountain',
+                'Двойное дно': 'fa-valley',
+                'Треугольник': 'fa-play',
+                'Флаг': 'fa-flag',
+                'Вымпел': 'fa-flag-checkered',
+                'Молот': 'fa-hammer',
+                'Повешенный': 'fa-user',
+                'Бычье поглощение': 'fa-arrow-up',
+                'Медвежье поглощение': 'fa-arrow-down',
+                'Доджи': 'fa-balance-scale'
+            };
+            return icons[patternName] || 'fa-chart-line';
+        }
+
+        function getPatternTypeClass(type) {
+            const classes = {
+                'Разворотные': 'reversal',
+                'Продолжения': 'continuation',
+                'Свечные': 'candlestick'
+            };
+            return classes[type] || 'default';
+        }
+
+        function getConfidenceClass(confidence) {
+            const classes = {
+                'Высокая': 'high',
+                'Средняя': 'medium',
+                'Низкая': 'low'
+            };
+            return classes[confidence] || 'medium';
+        }
+
+        function getConfidenceWidth(confidence) {
+            const widths = {
+                'Высокая': 80,
+                'Средняя': 50,
+                'Низкая': 30
+            };
+            return widths[confidence] || 50;
+        }
+
+        function getConfidenceIcon(confidence) {
+            const icons = {
+                'Высокая': 'fa-check-circle',
+                'Средняя': 'fa-info-circle',
+                'Низкая': 'fa-exclamation-circle'
+            };
+            return icons[confidence] || 'fa-info-circle';
+        }
+
         function showErrorState(message) {
             const container = document.getElementById('patterns-grid');
             container.innerHTML = `
@@ -612,7 +592,7 @@
             `;
         }
 
-        // Debounce функция
+        // Debounce функция для поиска
         function debounce(func, wait) {
             let timeout;
             return function executedFunction(...args) {
@@ -624,6 +604,17 @@
                 timeout = setTimeout(later, wait);
             };
         }
+
+        // Обработка ошибок изображений
+        window.addEventListener('error', function(e) {
+            if (e.target.tagName === 'IMG' && e.target.classList.contains('pattern-image')) {
+                e.target.style.display = 'none';
+                const fallback = e.target.nextElementSibling;
+                if (fallback && fallback.classList.contains('image-fallback')) {
+                    fallback.style.display = 'flex';
+                }
+            }
+        }, true);
     </script>
 </body>
 </html>

@@ -10,58 +10,7 @@
 </head>
 <body>
     <!-- Main Header -->
-    <header class="crypto-header">
-        <div class="header-content">
-            <div class="logo-container">
-                <a href="/" class="logo-link">
-                    <div class="logo">
-                        <i class="fas fa-chart-line"></i>
-                    </div>
-                    <div class="logo-text">
-                        <h1 class="logo-title">CryptoAnalyst Pro</h1>
-                        <div class="logo-subtitle">Technical Analysis</div>
-                    </div>
-                </a>
-            </div>
-
-            <div class="header-nav">
-                <a href="/" class="nav-item active">
-                    <div class="nav-icon">
-                        <i class="fas fa-home"></i>
-                    </div>
-                    <span class="nav-text">Главная</span>
-                </a>
-
-                <a href="/patterns" class="nav-item">
-                    <div class="nav-icon">
-                        <i class="fas fa-book"></i>
-                    </div>
-                    <span class="nav-text">Паттерны</span>
-                </a>
-
-                <a href="/dashboard" class="nav-item">
-                    <div class="nav-icon">
-                        <i class="fas fa-tachometer-alt"></i>
-                    </div>
-                    <span class="nav-text">Дашборд</span>
-                </a>
-            </div>
-                        <!-- Header Top Bar -->
-            <div class="header-top-bar">
-                <div class="lang-selector">
-                    <span data-i18n="language">Язык:</span>
-                    <select id="langSwitcher">
-                        <option value="ru">RU</option>
-                        <option value="en">EN</option>
-                    </select>
-                </div>
-                <button type="button" class="theme-toggle-btn" id="header-theme-toggle">
-                    <i class="fas fa-moon"></i>
-                    <span data-i18n="theme">Тема</span>
-                </button>
-            </div>
-        </div>
-    </header>
+    {% include '_header.html' %}
 
     <div class="container">
         <main>
