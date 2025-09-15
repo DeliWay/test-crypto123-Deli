@@ -490,6 +490,49 @@ async def get_batch_symbols_data(symbols: List[str], interval: str = '60', limit
     """Пакетное получение данных (асинхронная версия)"""
     return await _client.get_batch_symbols_data(symbols, interval, limit)
 
+# ==================== ДОПОЛНИТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ APP.PY ====================
+
+async def get_orderbook(symbol: str, limit: int = 25) -> Optional[Dict]:
+    """Асинхронная функция получения стакана заявок для app.py"""
+    try:
+        return await _client.get_orderbook(symbol, limit)
+    except Exception as e:
+        logger.error(f"Error in get_orderbook for {symbol}: {e}")
+        return None
+
+async def get_klines_async(symbol: str, interval: str = '60', limit: int = 500) -> Optional[pd.DataFrame]:
+    """Асинхронная функция получения свечных данных для app.py"""
+    try:
+        return await _client.get_klines(symbol, interval, limit)
+    except Exception as e:
+        logger.error(f"Error in get_klines_async for {symbol}: {e}")
+        return None
+
+async def get_ticker_info_async(symbol: str) -> Optional[Dict]:
+    """Асинхронная функция получения информации о тикере для app.py"""
+    try:
+        return await _client.get_ticker_info(symbol)
+    except Exception as e:
+        logger.error(f"Error in get_ticker_info_async for {symbol}: {e}")
+        return None
+
+async def get_available_symbols_async(quote_coin: str = 'USDT') -> List[str]:
+    """Асинхронная функция получения символов для app.py"""
+    try:
+        return await _client.get_spot_symbols(quote_coin)
+    except Exception as e:
+        logger.error(f"Error in get_available_symbols_async: {e}")
+        return await _client._get_default_symbols()
+
+# Синхронные версии для обратной совместимости
+def get_orderbook_sync(symbol: str, limit: int = 25) -> Optional[Dict]:
+    """Синхронная версия получения стакана"""
+    return asyncio.run(get_orderbook(symbol, limit))
+
+def get_klines_sync(symbol: str, interval: str = '60', limit: int = 500) -> Optional[pd.DataFrame]:
+    """Синхронная версия получения свечных данных"""
+    return asyncio.run(get_klines_async(symbol, interval, limit))
+
 # Синхронные версии для обратной совместимости
 def get_available_symbols_sync(quote_coin: str = 'USDT', source: str = 'bybit') -> List[str]:
     """Получение доступных символов (синхронная версия)"""
