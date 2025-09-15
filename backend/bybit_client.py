@@ -19,7 +19,7 @@ import hashlib
 logger = logging.getLogger(__name__)
 
 # Конфигурация
-REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
+REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:5000')
 BYBIT_BASE_URL = "https://api.bybit.com"
 BYBIT_WS_URL = "wss://stream.bybit.com/v5/public/spot"
 REQUEST_TIMEOUT = 15

@@ -12,8 +12,17 @@
             </a>
         </div>
 
-        <div class="header-nav">
-            <a href="/" class="nav-item active">
+        <!-- Кнопка мобильного меню -->
+        <button class="mobile-menu-toggle" id="mobile-menu-toggle">
+            <i class="fas fa-bars"></i>
+        </button>
+
+        <div class="header-nav" id="header-nav">
+            <button class="mobile-menu-close" id="mobile-menu-close">
+                <i class="fas fa-times"></i>
+            </button>
+
+            <a href="/" class="nav-item">
                 <div class="nav-icon">
                     <i class="fas fa-home"></i>
                 </div>
@@ -33,16 +42,32 @@
                 </div>
                 <span class="nav-text">Дашборд</span>
             </a>
-            <a href="/ai-predictions" class="nav-item active">
+            <a href="/ai-predictions" class="nav-item">
                 <div class="nav-icon">
                     <i class="fas fa-robot"></i>
                 </div>
                 <span class="nav-text">AI Прогнозы</span>
             </a>
+
+            <!-- Блок настроек (перенесен в мобильное меню) -->
+            <div class="header-settings mobile-settings">
+                <div class="lang-selector">
+                    <span data-i18n="language">Язык:</span>
+                    <select id="langSwitcherMobile">
+                        <option value="ru">RU</option>
+                        <option value="en">EN</option>
+                    </select>
+                </div>
+                    <button type="button" class="theme-toggle-btn" id="header-theme-toggle">
+                        <i class="fas fa-moon"></i>
+                        <span data-i18n="theme">Тема</span>
+                    </button>
+            </div>
         </div>
 
         <div class="header-actions">
-            <!-- Кнопка подписки -->
+
+            <!-- Кнопка подписки (всегда видимая) -->
             <div class="subscription-section">
                 <button class="subscribe-btn" id="subscribe-btn">
                     <i class="fas fa-crown premium-icon"></i>
@@ -72,27 +97,12 @@
                             </div>
                         </div>
                         <div class="pricing">
-                            <div class="price">$29.99</div>
+                            <div class="pricing-price">$29.99</div>
                             <div class="period" data-i18n="per_month">в месяц</div>
                         </div>
                         <button class="upgrade-btn" data-i18n="upgrade_now">Перейти сейчас</button>
                     </div>
                 </div>
-            </div>
-
-            <!-- Блок настроек -->
-            <div class="header-settings">
-                <div class="lang-selector">
-                    <span data-i18n="language">Язык:</span>
-                    <select id="langSwitcher">
-                        <option value="ru">RU</option>
-                        <option value="en">EN</option>
-                    </select>
-                </div>
-                <button type="button" class="theme-toggle-btn" id="header-theme-toggle">
-                    <i class="fas fa-moon"></i>
-                    <span data-i18n="theme">Тема</span>
-                </button>
             </div>
         </div>
     </div>
@@ -103,6 +113,7 @@
     background: var(--header-bg);
     border-bottom: 1px solid var(--border-color);
     padding: 0;
+    position: relative;
 }
 
 .header-content {
@@ -113,6 +124,8 @@
     height: 70px;
     max-width: 1400px;
     margin: 0 auto;
+    position: relative;
+    gap: 20px;
 }
 
 .header-actions {
@@ -138,6 +151,7 @@
     cursor: pointer;
     transition: all 0.3s ease;
     position: relative;
+    white-space: nowrap;
 }
 
 .subscribe-btn:hover {
@@ -177,6 +191,8 @@
 
 .subscription-section:hover .subscription-dropdown {
     opacity: 1;
+    background:bisque;
+    color: var(--bg-secondary-dark);
     visibility: visible;
     transform: translateY(0);
 }
@@ -191,7 +207,7 @@
 .dropdown-header h3 {
     margin: 0;
     font-size: 16px;
-    color: var(--text-primary);
+    color: var(--bg-secondary-dark);
 }
 
 .dropdown-header i {
@@ -220,15 +236,15 @@
     margin: 20px 0;
 }
 
-.price {
+.pricing-price {
+    color: var(--bg-secondary-dark);
     font-size: 24px;
     font-weight: bold;
-    color: var(--text-primary);
 }
 
 .period {
+    color: var(--bg-secondary-dark);
     font-size: 12px;
-    color: var(--text-secondary);
 }
 
 .upgrade-btn {
@@ -251,44 +267,341 @@
 .header-settings {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 15px;
 }
 
 .lang-selector {
     display: flex;
     align-items: center;
-    gap: 5px;
-    font-size: 12px;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--text-secondary);
 }
 
-#langSwitcher {
+#langSwitcher, #langSwitcherMobile {
     background: var(--input-bg);
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    padding: 4px;
+    padding: 6px 8px;
     color: var(--text-primary);
+    font-size: 14px;
 }
 
 .theme-toggle-btn {
     display: flex;
     align-items: center;
-    gap: 5px;
-    padding: 8px 12px;
+    gap: 8px;
+    padding: 8px 16px;
     background: var(--button-bg);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     color: var(--text-primary);
     cursor: pointer;
     transition: all 0.3s ease;
+    font-size: 14px;
 }
 
 .theme-toggle-btn:hover {
     background: var(--button-hover-bg);
 }
 
-@media (max-width: 768px) {
+/* Навигационное меню */
+.header-nav {
+    display: flex;
+    align-items: center;
+    gap: 25px;
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-decoration: none;
+    color: var(--text-secondary);
+    transition: all 0.3s ease;
+    padding: 8px 12px;
+    border-radius: 8px;
+    gap: 4px;
+}
+
+.nav-item:hover, .nav-item.active {
+    color: var(--accent-primary);
+    background: var(--bg-tertiary);
+}
+
+.nav-icon {
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
+
+.nav-icon i {
+    font-size: 18px;
+}
+
+.nav-text {
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Логотип */
+.logo-container {
+    flex-shrink: 0;
+}
+
+.logo-link {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    gap: 12px;
+}
+
+.logo {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #ff6b35, #f7931a);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.logo i {
+    font-size: 20px;
+    color: white;
+}
+
+.logo-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.logo-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.2;
+    background: linear-gradient(135deg, #ff6b35, #f7931a);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.logo-subtitle {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 400;
+    margin: 0;
+    line-height: 1.2;
+}
+
+/* Мобильное меню */
+.mobile-menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    z-index: 1001;
+}
+
+.mobile-menu-toggle:hover {
+    background: var(--button-hover-bg);
+}
+
+.mobile-menu-close {
+    display: none;
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.mobile-menu-close:hover {
+    background: var(--button-hover-bg);
+}
+
+/* Адаптивность */
+@media (max-width: 1200px) {
+    .header-nav {
+        gap: 15px;
+    }
+
+    .nav-item {
+        padding: 8px 10px;
+    }
+
+    .nav-text {
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 1024px) {
+    .header-nav {
+        position: fixed;
+        top: 0;
+        right: -300px;
+        width: 300px;
+        height: 100vh;
+        background: var(--bg-secondary);
+        border-left: 1px solid var(--border-color);
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: flex-start;
+        padding: 80px 20px 20px;
+        transition: right 0.3s ease;
+        z-index: 999;
+        box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
+        gap: 0;
+    }
+
+    .header-nav.active {
+        right: 0;
+    }
+
+    .nav-item {
+        width: 100%;
+        padding: 15px;
+        margin-bottom: 5px;
+        border-radius: 8px;
+        flex-direction: row;
+        gap: 15px;
+        justify-content: flex-start;
+    }
+
+    .nav-item:hover {
+        background: var(--bg-tertiary);
+    }
+
+    .nav-icon {
+        width: 20px;
+        height: 20px;
+    }
+
+    .nav-icon i {
+        font-size: 18px;
+    }
+
+    .nav-text {
+        font-size: 16px;
+    }
+
+    .mobile-menu-toggle {
+        display: block;
+    }
+
+    .mobile-menu-close {
+        display: block;
+    }
+
+    .desktop-settings {
+        display: none;
+    }
+
+    .mobile-settings {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border-color);
+        gap: 15px;
+    }
+
+    .mobile-settings .lang-selector {
+        width: 100%;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+
+    .mobile-settings .theme-toggle-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 800px) {
     .header-content {
+        display: ruby;
         padding: 0 15px;
+        gap: 15px;
+    }
+
+    .logo-title {
+        font-size: 18px;
+    }
+
+    .logo-subtitle {
+        font-size: 11px;
+    }
+
+    .logo {
+        width: 35px;
+        height: 35px;
+    }
+
+    .logo i {
+        font-size: 18px;
+    }
+
+    .subscribe-btn {
+        padding: 8px 16px;
+        font-size: 14px;
+    }
+
+    .subscribe-text {
+        display: inline;
+    }
+
+    .premium-badge {
+        display: inline-block;
+    }
+
+    .header-actions {
+        gap: 12px;
+    }
+
+    .header-settings {
+        gap: 10px;
+    }
+
+    .theme-toggle-btn span {
+        display: none;
+    }
+
+    .theme-toggle-btn {
+        padding: 8px 12px;
+    }
+
+    .lang-selector span {
+        display: none;
+    }
+}
+
+@media (max-width: 600px) {
+    .logo-title {
+        font-size: 16px;
+    }
+
+    .logo-subtitle {
+        display: none;
     }
 
     .subscribe-text {
@@ -296,7 +609,22 @@
     }
 
     .subscribe-btn {
-        padding: 10px;
+        padding: 8px 12px;
+    }
+
+    .premium-badge {
+        display: none;
+    }
+
+    .header-content {
+        gap: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .header-nav {
+        width: 100%;
+        right: -100%;
     }
 
     .subscription-dropdown {
@@ -304,13 +632,29 @@
         right: -50px;
     }
 
-    .header-settings {
-        gap: 5px;
+    .logo-title {
+        font-size: 14px;
     }
 
-    .lang-selector span {
-        display: none;
+    .header-content {
+        padding: 0 10px;
     }
+}
+
+/* Затемнение фона при открытом меню */
+.mobile-menu-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 998;
+}
+
+.mobile-menu-overlay.active {
+    display: block;
 }
 </style>
 
@@ -318,6 +662,14 @@
 document.addEventListener('DOMContentLoaded', function() {
     const subscribeBtn = document.getElementById('subscribe-btn');
     const dropdown = document.getElementById('subscription-dropdown');
+    const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+    const mobileMenuClose = document.getElementById('mobile-menu-close');
+    const headerNav = document.getElementById('header-nav');
+    const mobileMenuOverlay = document.createElement('div');
+
+    // Создаем overlay для затемнения фона
+    mobileMenuOverlay.className = 'mobile-menu-overlay';
+    document.body.appendChild(mobileMenuOverlay);
 
     // Обработчик для кнопки подписки
     subscribeBtn.addEventListener('click', function(e) {
@@ -336,5 +688,65 @@ document.addEventListener('DOMContentLoaded', function() {
     dropdown.addEventListener('click', function(e) {
         e.stopPropagation();
     });
+
+    // Открытие мобильного меню
+    mobileMenuToggle.addEventListener('click', function() {
+        headerNav.classList.add('active');
+        mobileMenuOverlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    });
+
+    // Закрытие мобильного меню
+    mobileMenuClose.addEventListener('click', closeMobileMenu);
+    mobileMenuOverlay.addEventListener('click', closeMobileMenu);
+
+    // Закрытие при нажатии на Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeMobileMenu();
+        }
+    });
+
+    function closeMobileMenu() {
+        headerNav.classList.remove('active');
+        mobileMenuOverlay.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    // Закрытие меню при клике на ссылку
+    const navItems = headerNav.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', function() {
+            closeMobileMenu();
+        });
+    });
+
+    // Синхронизация выбора языка
+    const langSwitcher = document.getElementById('langSwitcher');
+    const langSwitcherMobile = document.getElementById('langSwitcherMobile');
+
+    if (langSwitcher && langSwitcherMobile) {
+        langSwitcher.addEventListener('change', function() {
+            langSwitcherMobile.value = this.value;
+        });
+
+        langSwitcherMobile.addEventListener('change', function() {
+            langSwitcher.value = this.value;
+        });
+    }
+
+    // Синхронизация переключения темы
+    const themeToggle = document.getElementById('header-theme-toggle');
+    const themeToggleMobile = document.getElementById('header-theme-toggle-mobile');
+
+    if (themeToggle && themeToggleMobile) {
+        themeToggle.addEventListener('click', function() {
+            themeToggleMobile.click();
+        });
+
+        themeToggleMobile.addEventListener('click', function() {
+            themeToggle.click();
+        });
+    }
 });
 </script>
