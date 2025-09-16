@@ -1,0 +1,106 @@
+diff --git a/app.py b/app.py
+index 3c3c3c3..7b7b7b7 100644
+--- a/app.py
++++ b/app.py
+@@ -1,15 +1,26 @@
+-import os
+-import logging
+-import json
+-from datetime import datetime
+-import asyncio
+-from flask import Flask, jsonify, request, render_template
+-from flask_caching import Cache
+-from flask_socketio import SocketIO
+-from typing import Any
++import os
++import logging
++import json
++from datetime import datetime, timezone
++import asyncio
++from flask import Flask, jsonify, request, render_template, Response
++from flask_caching import Cache
++from flask_socketio import SocketIO
++from typing import Any
+@@
+ socketio = SocketIO(app, async_mode=_async_mode, cors_allowed_origins="*")
+
++# ---------- helpers: time & async flatten ----------
++def _utcnow_iso() -> str:
++    """Timezone-aware UTC ISO string with 'Z'."""
++    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
++
++async def _awaitify(obj: Any) -> Any:
++    """Recursively await coroutines/futures inside dicts/lists/tuples."""
++    if asyncio.iscoroutine(obj) or isinstance(obj, asyncio.Future):
++        return await obj
++    if isinstance(obj, dict):
++        return {k: await _awaitify(v) for k, v in obj.items()}
++    if isinstance(obj, (list, tuple)):
++        seq = [await _awaitify(v) for v in obj]
++        return type(obj)(seq)
++    return obj
++
+@@
+-@app.get("/api/market-data")
+-def market_data() -> Response:
++@app.get("/api/market-data")
++async def market_data() -> Response:
+     app.logger.info("GET /api/market-data - IP: %s", request.remote_addr)
+     symbol = request.args.get("symbol", "BTCUSDT")
+     timeframe = request.args.get("timeframe", "15")
+     limit = int(request.args.get("limit", "200"))
+     try:
+-        payload = build_market_data_payload(symbol, timeframe, limit)
+-        response_data = {
+-            'symbol': symbol,
+-            'timeframe': timeframe,
+-            'limit': limit,
+-            'timestamp': datetime.utcnow().isoformat() + 'Z',
+-            **payload
+-        }
++        payload = build_market_data_payload(symbol, timeframe, limit)
++        if asyncio.iscoroutine(payload):
++            payload = await payload
++        payload = await _awaitify(payload)
++        response_data = {
++            'symbol': symbol,
++            'timeframe': timeframe,
++            'limit': limit,
++            'timestamp': _utcnow_iso(),
++            **(payload or {})
++        }
+         etag = generate_etag(response_data)
+         return jsonify(response_data), 200
+     except Exception as e:
+         app.logger.error("Market data error: %s", e, exc_info=True)
+         return json_error(502, "market_data_failed", str(e))
+@@
+-async def historical_data(symbol: str) -> Response:
++async def historical_data(symbol: str) -> Response:
+@@
+-            'timestamp': datetime.utcnow().isoformat() + 'Z'
++            'timestamp': _utcnow_iso()
+@@
+-            'timestamp': datetime.utcnow().isoformat() + 'Z'
++            'timestamp': _utcnow_iso()
+@@
+-            'timestamp': datetime.utcnow().isoformat() + 'Z',
++            'timestamp': _utcnow_iso(),
+@@
+-        'timestamp': datetime.utcnow().isoformat() + 'Z',
++        'timestamp': _utcnow_iso(),
+@@
+-        token = hashlib.sha256(f"{datetime.utcnow().isoformat()}{app.config['SECRET_KEY']}".encode()).hexdigest()
++        token = hashlib.sha256(f"{_utcnow_iso()}{app.config['SECRET_KEY']}".encode()).hexdigest()
+@@
+-            'timestamp': datetime.utcnow().isoformat() + 'Z'
++            'timestamp': _utcnow_iso()
+@@
+-        'timestamp': datetime.utcnow().isoformat() + 'Z'
++        'timestamp': _utcnow_iso()
+@@
+-        'timestamp': datetime.utcnow().isoformat() + 'Z'
++        'timestamp': _utcnow_iso()
+@@
+-        'timestamp': datetime.utcnow().isoformat() + 'Z'
++        'timestamp': _utcnow_iso()

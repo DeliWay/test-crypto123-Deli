@@ -1,6 +1,7 @@
 """
 ULTRA-PERFORMANCE BYBIT CLIENT
 Асинхронный клиент с 15x улучшением производительности
+Встроенное кэширование с TTL для избежания AttributeError
 Самостоятельная реализация без внешних зависимостей
 """
 import os
@@ -19,6 +20,10 @@ import redis.asyncio as redis
 from circuitbreaker import circuit
 from dataclasses import dataclass
 import hashlib
+
+class BybitClientError(Exception):
+    """Кастомное исключение для ошибок клиента Bybit"""
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +71,8 @@ class UltraBybitClient:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
+            cls._instance.symbols_cache = {}
+            cls._instance.generic_cache = {}
         return cls._instance
 
     async def init(self):
@@ -93,7 +100,7 @@ class UltraBybitClient:
                 self._redis = await redis.from_url(
                     REDIS_URL,
                     decode_responses=True,
-                    max_connections=100,
+                    max_connections=10,
                     socket_timeout=1
                 )
                 await self._redis.ping()
@@ -102,7 +109,7 @@ class UltraBybitClient:
                 self._redis = None
 
         self.rate_limiter = UltraRateLimiter(10, 0.5)
-        self.symbols_cache = {}
+        self.cache_ttl_seconds = CACHE_TTL
         self.cache_timeout = CACHE_TTL
         self.request_stats = []
 
@@ -119,6 +126,26 @@ class UltraBybitClient:
         self._ws_connections.clear()
 
     @lru_cache(maxsize=10000)
+    def _now(self):
+        """Текущее время для кэширования"""
+        return time.time()
+
+    def _cache_get(self, key):
+        """Получение данных из внутреннего кэша"""
+        if key in self.symbols_cache:
+            cached_data = self.symbols_cache[key]
+            if self._now() - cached_data['ts'] <= self.cache_ttl_seconds:
+                return cached_data['value']
+            else:
+                del self.symbols_cache[key]
+        return None
+
+    def _cache_set(self, key, value):
+        """Сохранение данных во внутренний кэш"""
+        self.symbols_cache[key] = {'value': value, 'ts': self._now()}
+        return True
+
+    @lru_cache(maxsize=10000)
     def _generate_cache_key(self, endpoint: str, **params) -> str:
         """Генерация ключа кэша"""
         param_str = '_'.join(f"{k}_{v}" for k, v in sorted(params.items()))
@@ -127,7 +154,7 @@ class UltraBybitClient:
     async def _cache_get(self, key: str) -> Optional[Any]:
         """Получение данных из кэша"""
         if not self._redis:
-            return self.symbols_cache.get(key)
+            return self._cache_get(key)
 
         try:
             data = await self._redis.get(key)
@@ -138,7 +165,7 @@ class UltraBybitClient:
     async def _cache_set(self, key: str, data: Any, ttl: int = CACHE_TTL):
         """Сохранение данных в кэш"""
         self.symbols_cache[key] = data
-        if self._redis:
+        if self._redis and not self._redis.closed:
             try:
                 await self._redis.setex(key, ttl, json.dumps(data))
             except Exception as e:
@@ -187,25 +214,33 @@ class UltraBybitClient:
 
     async def get_spot_symbols(self, quote_coin: str = 'USDT') -> List[str]:
         """Получение списка спот символов"""
-        cache_key = f"symbols:{quote_coin}"
-        cached = await self._cache_get(cache_key)
+        cache_key = ("spot", quote_coin.upper())
+        cached = self._cache_get(cache_key)
         if cached:
             return cached
 
-        data = await self._make_request('market/instruments-info', {'category': 'spot'})
-        if not data:
+        try:
+            data = await self._make_request('market/instruments-info', {'category': 'spot'})
+            if not data:
+                raise BybitClientError("No data received from Bybit API")
+
+            symbols_list = data.get('result', {}).get('list', [])
+            if not symbols_list:
+                raise BybitClientError("Empty symbols list from Bybit")
+
+            symbols = [
+                symbol['symbol'] for symbol in symbols_list
+                if (symbol.get('quoteCoin') == quote_coin and
+                    symbol.get('status') == 'Trading')
+            ]
+
+            symbols = sorted(symbols)
+            self._cache_set(cache_key, symbols)
+            return symbols
+
+        except Exception as e:
+            logger.error(f"Error fetching symbols from Bybit: {e}")
             return await self._get_default_symbols()
-
-        symbols_list = data.get('result', {}).get('list', [])
-        symbols = [
-            symbol['symbol'] for symbol in symbols_list
-            if (symbol.get('quoteCoin') == quote_coin and
-                symbol.get('status') == 'Trading')
-        ]
-
-        symbols = sorted(symbols)
-        await self._cache_set(cache_key, symbols)
-        return symbols
 
     async def _get_default_symbols(self) -> List[str]:
         """Резервный список символов"""

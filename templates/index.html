@@ -21,15 +21,15 @@
                     <p class="hero-subtitle">Профессиональный анализ криптовалютных рынков в реальном времени</p>
                     <div class="hero-stats">
                         <div class="stat-item">
-                            <span class="stat-value" id="total-market-cap">$2.1T</span>
+                            <span class="stat-value" id="total-market-cap">$0</span>
                             <span class="stat-label">Капитализация рынка</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-value" id="total-volume">$128B</span>
+                            <span class="stat-value" id="total-volume">$0</span>
                             <span class="stat-label">Объем (24ч)</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-value" id="active-cryptos">12,845</span>
+                            <span class="stat-value" id="active-cryptos">0</span>
                             <span class="stat-label">Криптовалют</span>
                         </div>
                     </div>
@@ -85,8 +85,8 @@
                             <i class="fas fa-arrow-up trend-up"></i>
                             <h3>Растущие</h3>
                         </div>
-                        <div class="market-card-value" id="rising-count">187</div>
-                        <div class="market-card-change positive">+12%</div>
+                        <div class="market-card-value" id="rising-count">0</div>
+                        <div class="market-card-change positive">+0%</div>
                     </div>
 
                     <div class="market-card">
@@ -94,8 +94,8 @@
                             <i class="fas fa-arrow-down trend-down"></i>
                             <h3>Падающие</h3>
                         </div>
-                        <div class="market-card-value" id="falling-count">94</div>
-                        <div class="market-card-change negative">-8%</div>
+                        <div class="market-card-value" id="falling-count">0</div>
+                        <div class="market-card-change negative">-0%</div>
                     </div>
 
                     <div class="market-card">
@@ -103,8 +103,8 @@
                             <i class="fas fa-minus trend-neutral"></i>
                             <h3>Стабильные</h3>
                         </div>
-                        <div class="market-card-value" id="stable-count">56</div>
-                        <div class="market-card-change neutral">±2%</div>
+                        <div class="market-card-value" id="stable-count">0</div>
+                        <div class="market-card-change neutral">±0%</div>
                     </div>
 
                     <div class="market-card">
@@ -112,8 +112,8 @@
                             <i class="fas fa-bolt"></i>
                             <h3>Волатильность</h3>
                         </div>
-                        <div class="market-card-value" id="volatility-index">3.8%</div>
-                        <div class="market-card-label">Высокая</div>
+                        <div class="market-card-value" id="volatility-index">0%</div>
+                        <div class="market-card-label">Средняя</div>
                     </div>
                 </div>
             </section>
@@ -150,11 +150,9 @@
                         </div>
                         <h3>AI Прогнозы</h3>
                         <p>Прогнозы на основе машинного обучения и искусственного интеллекта</p>
-                        <button class="btn btn-primary" disabled>
-                            <a href="/ai-predictions" class="btn btn-primary">
-                                <i class="fas fa-robot"></i> Смотреть прогнозы
-                            </a>
-                        </button>
+                        <a href="/ai-predictions" class="btn btn-primary">
+                            <i class="fas fa-robot"></i> Смотреть прогнозы
+                        </a>
                     </div>
                 </div>
             </section>
@@ -168,40 +166,18 @@
                     </a>
                 </div>
 
-                <div class="patterns-grid-mini">
+                <div class="patterns-grid-mini" id="patterns-container">
                     <div class="pattern-card-mini">
                         <div class="pattern-header-mini">
-                            <h4>Двойное дно</h4>
-                            <span class="confidence-badge high">Высокая</span>
+                            <h4>Загрузка...</h4>
+                            <span class="confidence-badge medium">Загрузка</span>
                         </div>
-                        <div class="pattern-symbol">BTC/USDT</div>
-                        <div class="pattern-timeframe">4H</div>
-                        <div class="pattern-profit">+8.5% потенциал</div>
-                    </div>
-
-                    <div class="pattern-card-mini">
-                        <div class="pattern-header-mini">
-                            <h4>Бычье поглощение</h4>
-                            <span class="confidence-badge medium">Средняя</span>
-                        </div>
-                        <div class="pattern-symbol">ETH/USDT</div>
-                        <div class="pattern-timeframe">1H</div>
-                        <div class="pattern-profit">+5.2% потенциал</div>
-                    </div>
-
-                    <div class="pattern-card-mini">
-                        <div class="pattern-header-mini">
-                            <h4>Голова и плечи</h4>
-                            <span class="confidence-badge high">Высокая</span>
-                        </div>
-                        <div class="pattern-symbol">SOL/USDT</div>
-                        <div class="pattern-timeframe">1D</div>
-                        <div class="pattern-profit">-6.8% потенциал</div>
+                        <div class="pattern-symbol">Загрузка...</div>
+                        <div class="pattern-timeframe">Загрузка...</div>
+                        <div class="pattern-profit">Загрузка...</div>
                     </div>
                 </div>
             </section>
-            
-
         </main>
 
         <footer class="main-footer">
@@ -216,73 +192,170 @@
     </div>
 
     <script>
-    // ===== КОНФИГУРАЦИЯ =====
+    // ===== КОНФИГУРАЦИЯ ПРИЛОЖЕНИЯ =====
     const AppConfig = {
         refreshInterval: 30000,
-        apiEndpoint: '/api/top-cryptos'
+        apiBaseUrl: '',
+        defaultSymbol: 'BTCUSDT',
+        defaultTimeframe: '15',
+        defaultLimit: 200
     };
 
-    // ===== СОСТОЯНИЕ =====
+    // ===== ГЛОБАЛЬНОЕ СОСТОЯНИЕ ПРИЛОЖЕНИЯ =====
     let AppState = {
         cryptosData: [],
+        symbolsList: [],
+        marketOverview: {
+            rising: 0,
+            falling: 0,
+            stable: 0,
+            volatility: 0
+        },
         lastUpdate: null,
-        autoRefresh: true
+        isLoading: false,
+        refreshIntervalId: null
     };
 
     // ===== ОСНОВНАЯ ЛОГИКА =====
     class CryptoDashboard {
-        static init() {
+        static async init() {
             this.setupEventListeners();
-            this.loadCryptoData();
+            await this.loadSymbols();
+            await this.loadMarketData();
+            await this.loadSignals();
             this.startAutoRefresh();
-            this.initTheme();
         }
 
         static setupEventListeners() {
             // Обновление данных
             document.getElementById('refresh-prices').addEventListener('click', () => {
-                this.loadCryptoData();
+                this.loadMarketData();
+                this.loadSignals();
             });
-
-            // Переключение темы
-            const themeToggle = document.getElementById('header-theme-toggle');
-            if (themeToggle) {
-                themeToggle.addEventListener('click', this.toggleTheme);
-            }
         }
 
-        static async loadCryptoData() {
+        static async loadSymbols() {
             try {
-                this.showLoadingState();
-
-                const response = await fetch(AppConfig.apiEndpoint);
+                const response = await fetch('/api/symbols');
                 if (!response.ok) throw new Error('Network error');
 
                 const data = await response.json();
 
-                if (data.success) {
-                    AppState.cryptosData = data.cryptos;
-                    AppState.lastUpdate = new Date();
-                    this.updateUI(data.cryptos);
-                    this.updateMarketOverview(data.cryptos);
+                if (data.symbols && Array.isArray(data.symbols)) {
+                    AppState.symbolsList = data.symbols;
+                    document.getElementById('active-cryptos').textContent = data.symbols.length.toLocaleString();
                 }
             } catch (error) {
-                console.error('Error loading crypto data:', error);
-                this.showError();
+                console.error('Error loading symbols:', error);
+                // Используем стандартный список символов при ошибке
+                AppState.symbolsList = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
+                                      'ADAUSDT', 'DOGEUSDT', 'DOTUSDT', 'MATICUSDT', 'LTCUSDT'];
+                document.getElementById('active-cryptos').textContent = AppState.symbolsList.length.toLocaleString();
             }
         }
 
-        static updateUI(cryptos) {
+        static async loadMarketData() {
+            try {
+                this.showLoadingState();
+
+                // Используем стандартный список символов
+                const topSymbols = AppState.symbolsList.length > 0 ?
+                    AppState.symbolsList.slice(0, 10) :
+                    ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
+                     'ADAUSDT', 'DOGEUSDT', 'DOTUSDT', 'MATICUSDT', 'LTCUSDT'];
+
+                const marketDataPromises = topSymbols.map(symbol =>
+                    fetch(`/api/market-data?symbol=${symbol}&timeframe=${AppConfig.defaultTimeframe}&limit=${AppConfig.defaultLimit}`)
+                        .then(response => {
+                            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (data.error) throw new Error(data.error);
+                            return data;
+                        })
+                        .catch(error => {
+                            console.warn(`Error loading data for ${symbol}:`, error);
+                            // Возвращаем базовые данные при ошибке
+                            return {
+                                symbol: symbol,
+                                ticker_info: {
+                                    lastPrice: 0,
+                                    price24hPcnt: 0,
+                                    volume24h: 0,
+                                    marketCap: 0,
+                                    highPrice24h: 0,
+                                    lowPrice24h: 0
+                                }
+                            };
+                        })
+                );
+
+                const results = await Promise.all(marketDataPromises);
+
+                // Фильтруем только те результаты, которые имеют данные
+                AppState.cryptosData = results.map(result => ({
+                    symbol: result.symbol,
+                    price: result.ticker_info?.lastPrice || 0,
+                    price_change: result.ticker_info?.price24hPcnt ? result.ticker_info.price24hPcnt * 100 : 0,
+                    volume: result.ticker_info?.volume24h || 0,
+                    marketCap: result.ticker_info?.marketCap || 0,
+                    high24h: result.ticker_info?.highPrice24h || 0,
+                    low24h: result.ticker_info?.lowPrice24h || 0
+                })).filter(crypto => crypto.price > 0); // Фильтруем крипты с нулевой ценой
+
+                // Сортируем по рыночной капитализации (по убыванию)
+                AppState.cryptosData.sort((a, b) => b.marketCap - a.marketCap);
+
+                this.updateUI();
+                this.updateMarketOverview();
+                this.updateHeroSection();
+
+            } catch (error) {
+                console.error('Error loading market data:', error);
+                this.showError();
+            } finally {
+                this.hideLoadingState();
+            }
+        }
+
+        static async loadSignals() {
+            try {
+                const response = await fetch(`/api/signals/${AppConfig.defaultSymbol}?timeframe=${AppConfig.defaultTimeframe}&limit=6`);
+                if (!response.ok) throw new Error('Network error');
+
+                const data = await response.json();
+                this.updateSignalsUI(data.signals || []);
+            } catch (error) {
+                console.error('Error loading signals:', error);
+                // Мягкая деградация - показываем заглушку
+                this.updateSignalsUI([]);
+            }
+        }
+
+        static updateUI() {
             const tableBody = document.getElementById('crypto-table-body');
             if (!tableBody) return;
 
-            tableBody.innerHTML = cryptos.map((crypto, index) => `
+            if (!AppState.cryptosData.length) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="error-row">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <span>Нет данных для отображения</span>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tableBody.innerHTML = AppState.cryptosData.map((crypto, index) => `
                 <tr class="crypto-row" data-symbol="${crypto.symbol}">
                     <td class="rank">${index + 1}</td>
                     <td class="crypto-name">
                         <div class="crypto-info">
                             <span class="crypto-symbol">${crypto.symbol}</span>
-                            <span class="crypto-fullname">${crypto.name}</span>
+                            <span class="crypto-fullname">${this.getCryptoName(crypto.symbol)}</span>
                         </div>
                     </td>
                     <td class="price">$${this.formatPrice(crypto.price)}</td>
@@ -291,10 +364,10 @@
                         ${Math.abs(crypto.price_change).toFixed(2)}%
                     </td>
                     <td class="volume">$${this.formatNumber(crypto.volume)}</td>
-                    <td class="market-cap">$${this.formatNumber(crypto.price * 1000000)}</td>
+                    <td class="market-cap">$${this.formatNumber(crypto.marketCap)}</td>
                     <td class="chart">
                         <div class="mini-chart" id="chart-${crypto.symbol}">
-                            <div class="chart-line" style="height: 30px; width: 80px; background: #e0e0e0;"></div>
+                            <div class="chart-line" style="height: 30px; width: 80px; background: ${crypto.price_change >= 0 ? '#10b981' : '#ef4444'}; opacity: 0.6;"></div>
                         </div>
                     </td>
                     <td class="actions">
@@ -306,25 +379,126 @@
             `).join('');
 
             // Обновляем время
-            document.getElementById('prices-update-time').textContent = new Date().toLocaleTimeString();
+            const now = new Date();
+            document.getElementById('prices-update-time').textContent = now.toLocaleTimeString();
+            AppState.lastUpdate = now;
         }
 
-        static updateMarketOverview(cryptos) {
+        static updateMarketOverview() {
+            if (!AppState.cryptosData.length) return;
+
             // Статистика рынка
-            const rising = cryptos.filter(c => c.price_change > 0).length;
-            const falling = cryptos.filter(c => c.price_change < 0).length;
-            const stable = cryptos.filter(c => Math.abs(c.price_change) <= 1).length;
+            const rising = AppState.cryptosData.filter(c => c.price_change > 0).length;
+            const falling = AppState.cryptosData.filter(c => c.price_change < 0).length;
+            const stable = AppState.cryptosData.filter(c => Math.abs(c.price_change) <= 1).length;
+
+            // Расчет волатильности (среднее абсолютное изменение)
+            const volatility = AppState.cryptosData.reduce((sum, crypto) => sum + Math.abs(crypto.price_change), 0) / AppState.cryptosData.length;
 
             document.getElementById('rising-count').textContent = rising;
             document.getElementById('falling-count').textContent = falling;
             document.getElementById('stable-count').textContent = stable;
+            document.getElementById('volatility-index').textContent = volatility.toFixed(1) + '%';
 
             // Обновляем общую статистику
-            const totalVolume = cryptos.reduce((sum, crypto) => sum + crypto.volume, 0);
+            const totalMarketCap = AppState.cryptosData.reduce((sum, crypto) => sum + crypto.marketCap, 0);
+            const totalVolume = AppState.cryptosData.reduce((sum, crypto) => sum + crypto.volume, 0);
+
+            document.getElementById('total-market-cap').textContent = `$${this.formatNumber(totalMarketCap)}`;
             document.getElementById('total-volume').textContent = `$${this.formatNumber(totalVolume)}`;
+
+            // Сохраняем данные для последующего использования
+            AppState.marketOverview = { rising, falling, stable, volatility };
+        }
+
+        static updateHeroSection() {
+            if (!AppState.cryptosData.length) return;
+
+            // Используем BTCUSDT как основной символ для героя
+            const btcData = AppState.cryptosData.find(crypto => crypto.symbol === 'BTCUSDT') || AppState.cryptosData[0];
+            if (btcData && btcData.price > 0) {
+                const heroTitle = document.querySelector('.hero-title');
+                if (heroTitle) {
+                    heroTitle.textContent = `${btcData.symbol.replace('USDT', '')}: $${this.formatPrice(btcData.price)}`;
+                }
+
+                const heroSubtitle = document.querySelector('.hero-subtitle');
+                if (heroSubtitle) {
+                    const changeText = btcData.price_change >= 0 ?
+                        `+${btcData.price_change.toFixed(2)}%` :
+                        `${btcData.price_change.toFixed(2)}%`;
+
+                    heroSubtitle.innerHTML = `24ч: ${changeText} | High: $${this.formatPrice(btcData.high24h)} | Low: $${this.formatPrice(btcData.low24h)}`;
+                }
+            }
+        }
+
+        static updateSignalsUI(signals) {
+            const patternsContainer = document.getElementById('patterns-container');
+            if (!patternsContainer) return;
+
+            if (!signals || signals.length === 0) {
+                patternsContainer.innerHTML = `
+                    <div class="pattern-card-mini">
+                        <div class="pattern-header-mini">
+                            <h4>Нет сигналов</h4>
+                            <span class="confidence-badge neutral">Нет данных</span>
+                        </div>
+                        <div class="pattern-symbol">${AppConfig.defaultSymbol}</div>
+                        <div class="pattern-timeframe">Попробуйте позже</div>
+                        <div class="pattern-profit">0% потенциал</div>
+                    </div>
+                `;
+                return;
+            }
+
+            patternsContainer.innerHTML = signals.slice(0, 3).map(signal => `
+                <div class="pattern-card-mini">
+                    <div class="pattern-header-mini">
+                        <h4>${signal.type || 'Сигнал'}</h4>
+                        <span class="confidence-badge ${this.getConfidenceClass(signal.confidence)}">
+                            ${this.getConfidenceText(signal.confidence)}
+                        </span>
+                    </div>
+                    <div class="pattern-symbol">${AppConfig.defaultSymbol}</div>
+                    <div class="pattern-timeframe">${signal.timeframe || AppConfig.defaultTimeframe}</div>
+                    <div class="pattern-profit ${signal.potential >= 0 ? 'positive' : 'negative'}">
+                        ${signal.potential >= 0 ? '+' : ''}${(signal.potential || 0).toFixed(1)}% потенциал
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        static getConfidenceClass(confidence) {
+            if (confidence >= 0.8) return 'high';
+            if (confidence >= 0.5) return 'medium';
+            return 'low';
+        }
+
+        static getConfidenceText(confidence) {
+            if (confidence >= 0.8) return 'Высокая';
+            if (confidence >= 0.5) return 'Средняя';
+            return 'Низкая';
+        }
+
+        static getCryptoName(symbol) {
+            const nameMap = {
+                'BTCUSDT': 'Bitcoin',
+                'ETHUSDT': 'Ethereum',
+                'BNBUSDT': 'Binance Coin',
+                'SOLUSDT': 'Solana',
+                'XRPUSDT': 'Ripple',
+                'ADAUSDT': 'Cardano',
+                'DOGEUSDT': 'Dogecoin',
+                'DOTUSDT': 'Polkadot',
+                'MATICUSDT': 'Polygon',
+                'LTCUSDT': 'Litecoin'
+            };
+            return nameMap[symbol] || symbol.replace('USDT', '');
         }
 
         static showLoadingState() {
+            AppState.isLoading = true;
             const tableBody = document.getElementById('crypto-table-body');
             if (tableBody) {
                 tableBody.innerHTML = `
@@ -338,6 +512,10 @@
             }
         }
 
+        static hideLoadingState() {
+            AppState.isLoading = false;
+        }
+
         static showError() {
             const tableBody = document.getElementById('crypto-table-body');
             if (tableBody) {
@@ -346,7 +524,7 @@
                         <td colspan="8" class="error-row">
                             <i class="fas fa-exclamation-triangle"></i>
                             <span>Ошибка загрузки данных</span>
-                            <button class="btn btn-sm" onclick="CryptoDashboard.loadCryptoData()">
+                            <button class="btn btn-sm" onclick="CryptoDashboard.loadMarketData()">
                                 <i class="fas fa-sync"></i> Попробовать снова
                             </button>
                         </td>
@@ -356,57 +534,39 @@
         }
 
         static startAutoRefresh() {
-            setInterval(() => {
-                if (AppState.autoRefresh) {
-                    this.loadCryptoData();
+            // Останавливаем предыдущий интервал, если он есть
+            if (AppState.refreshIntervalId) {
+                clearInterval(AppState.refreshIntervalId);
+            }
+
+            AppState.refreshIntervalId = setInterval(() => {
+                if (!AppState.isLoading) {
+                    this.loadMarketData();
+                    this.loadSignals();
                 }
             }, AppConfig.refreshInterval);
         }
 
-        static toggleTheme() {
-            const currentTheme = document.documentElement.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-
-            document.documentElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem('cryptoanalyst_theme', newTheme);
-
-            const themeIcon = document.querySelector('#header-theme-toggle i');
-            if (themeIcon) {
-                themeIcon.className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
-            }
-        }
-
-        static initTheme() {
-            const savedTheme = localStorage.getItem('cryptoanalyst_theme');
-            const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-            const theme = savedTheme || systemTheme;
-
-            document.documentElement.setAttribute('data-theme', theme);
-
-            const themeIcon = document.querySelector('#header-theme-toggle i');
-            if (themeIcon) {
-                themeIcon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
-            }
-        }
-
         static formatPrice(price) {
-            if (price >= 1000) return price.toFixed(0);
-            if (price >= 1) return price.toFixed(2);
-            if (price >= 0.01) return price.toFixed(4);
-            return price.toFixed(6);
+            if (!price || price === 0) return '0';
+            if (price >= 1000) return price.toLocaleString('en-US', { maximumFractionDigits: 0 });
+            if (price >= 1) return price.toLocaleString('en-US', { maximumFractionDigits: 2 });
+            if (price >= 0.01) return price.toLocaleString('en-US', { maximumFractionDigits: 4 });
+            return price.toLocaleString('en-US', { maximumFractionDigits: 6 });
         }
 
         static formatNumber(num) {
-            if (num >= 1000000000) return (num / 1000000000).toFixed(2) + 'B';
-            if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M';
-            if (num >= 1000) return (num / 1000).toFixed(2) + 'K';
-            return num.toFixed(2);
+            if (!num || num === 0) return '0';
+            if (num >= 1000000000) return (num / 1000000000).toLocaleString('en-US', { maximumFractionDigits: 2 }) + 'B';
+            if (num >= 1000000) return (num / 1000000).toLocaleString('en-US', { maximumFractionDigits: 2 }) + 'M';
+            if (num >= 1000) return (num / 1000).toLocaleString('en-US', { maximumFractionDigits: 2 }) + 'K';
+            return num.toLocaleString('en-US', { maximumFractionDigits: 2 });
         }
     }
 
     // Инициализация при загрузке
     document.addEventListener('DOMContentLoaded', () => {
-        CryptoDashboard.init();
+        CryptoDashboard.init().catch(console.error);
     });
     </script>
 
@@ -795,7 +955,42 @@
 
     .pattern-profit {
         font-weight: 600;
+    }
+
+    .pattern-profit.positive {
         color: var(--accent-success);
+    }
+
+    .pattern-profit.negative {
+        color: var(--accent-error);
+    }
+
+    .confidence-badge {
+        padding: 0.3rem 0.8rem;
+        border-radius: 15px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .confidence-badge.high {
+        background: rgba(16, 185, 129, 0.2);
+        color: var(--accent-success);
+    }
+
+    .confidence-badge.medium {
+        background: rgba(245, 158, 11, 0.2);
+        color: var(--accent-warning);
+    }
+
+    .confidence-badge.low {
+        background: rgba(239, 68, 68, 0.2);
+        color: var(--accent-error);
+    }
+
+    .confidence-badge.neutral {
+        background: rgba(100, 116, 139, 0.2);
+        color: var(--text-secondary);
     }
 
     /* Адаптивность */

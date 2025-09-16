@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import json
 import time
 import threading
@@ -91,12 +92,19 @@ except Exception as e:
 Compress(app)
 
 # WebSocket
+async_mode = os.getenv('SOCKETIO_ASYNC_MODE', 'threading')
 try:
-    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet',
-                        logger=False, engineio_logger=False)
+    socketio = SocketIO(
+        app,
+        cors_allowed_origins="*",
+        async_mode=async_mode,
+        logger=False,
+        engineio_logger=False
+    )
 except Exception as e:
-    socketio = None
-    logger.warning(f"SocketIO initialization failed: {e}")
+    logger.warning(f"SocketIO initialization failed with {async_mode}: {e}, falling back to threading")
+    socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*",
+                       logger=False, engineio_logger=False)
 
 # Инициализация клиентов
 
@@ -184,6 +192,12 @@ def cleanup_memory_cache() -> None:
     if keys_to_delete:
         logger.info(f"Memory cache cleaned: {len(keys_to_delete)} entries removed")
 
+
+def json_error(status: int, code: str, detail: str) -> Response:
+    """Универсальный хелпер для JSON ошибок"""
+    response = jsonify({'error': code, 'detail': detail})
+    response.status_code = status
+    return response
 
 def generate_etag(data: Any) -> str:
     """Генерация ETag для кэширования"""
@@ -318,7 +332,6 @@ async def market_data() -> Response:
 
 
 @app.route('/api/technical-analysis/<symbol>')
-@cache.cached(timeout=30, query_string=True)
 @async_handler
 async def technical_analysis(symbol: str) -> Response:
     """Расширенный технический анализ"""
@@ -373,7 +386,6 @@ async def ml_analysis(symbol: str) -> Response:
 
 
 @app.route('/api/symbols')
-@cache.cached(timeout=3600)
 @async_handler
 async def get_symbols() -> Response:
     """Получение списка символов"""
@@ -382,22 +394,25 @@ async def get_symbols() -> Response:
         source = request.args.get('source', 'bybit')
 
         symbols = await get_available_symbols(quote_coin, source)
+        if not symbols:
+            return json_error(502, 'symbols_fetch_failed', 'No symbols available from exchange')
 
         return jsonify({
             'symbols': symbols,
             'count': len(symbols),
             'quote_coin': quote_coin,
             'source': source,
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'cached': False
         })
 
     except Exception as e:
         logger.error(f"Symbols fetch error: {e}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        return json_error(502, 'symbols_fetch_failed',
+                         f'Failed to fetch symbols: {str(e)}')
 
 
 @app.route('/api/orderbook/<symbol>')
-@cache.cached(timeout=5, query_string=True)
 @async_handler
 async def get_orderbook_endpoint(symbol: str) -> Response:
     """Стакан заявок"""
@@ -419,7 +434,6 @@ async def get_orderbook_endpoint(symbol: str) -> Response:
 
 
 @app.route('/api/historical-data/<symbol>')
-@cache.cached(timeout=300, query_string=True)
 @async_handler
 async def historical_data(symbol: str) -> Response:
     """Исторические данные"""
@@ -465,7 +479,6 @@ async def historical_data(symbol: str) -> Response:
 
 
 @app.route('/api/indicators/<symbol>')
-@cache.cached(timeout=60, query_string=True)
 @async_handler
 async def get_indicators(symbol: str) -> Response:
     """Получение технических индикаторов"""
@@ -501,7 +514,6 @@ async def get_indicators(symbol: str) -> Response:
 
 
 @app.route('/api/signals/<symbol>')
-@cache.cached(timeout=30, query_string=True)
 @async_handler
 async def get_signals(symbol: str) -> Response:
     """Получение торговых сигналов"""
@@ -596,7 +608,6 @@ def health_check() -> Response:
 
 
 @app.route('/api/performance')
-@cache.cached(timeout=60)
 def performance_metrics() -> Response:
     """Метрики производительности"""
     metrics = {
@@ -619,7 +630,6 @@ def performance_metrics() -> Response:
 
 
 @app.route('/api/tradingview/config')
-@cache.cached(timeout=3600)
 @async_handler
 async def tradingview_config() -> Response:
     """Конфигурация TradingView"""
@@ -794,18 +804,21 @@ def initialize_app() -> None:
     def pre_warm_background():
         async def async_pre_warm():
             try:
-                logger.info("Pre-warming caches and services...")
+                logger.info("Starting background pre-warming...")
 
                 # Предзагрузка популярных символов
                 popular_symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT']
 
                 for symbol in popular_symbols:
                     try:
-                        await get_market_data(symbol, '15', 100)
+                        data = await get_market_data(symbol, '15', 100)
+                        if data is not None:
+                            logger.debug(f"Pre-warmed data for {symbol}")
+                        else:
+                            logger.warning(f"Pre-warm failed for {symbol}: No data")
                         await asyncio.sleep(0.1)  # Rate limiting
                     except Exception as e:
-                        logger.warning(f"Pre-warm failed for {symbol}: {e}")
-
+                        logger.warning(f"Pre-warm failed for {symbol}: {str(e)}")
                 logger.info("Pre-warming completed successfully")
 
             except Exception as e:
