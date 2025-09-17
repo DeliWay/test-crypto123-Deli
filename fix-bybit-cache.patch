@@ -1,0 +1,46 @@
+--- backend/bybit_client.py(orig)
+
++++ backend/bybit_client.py
+
+@@ -154,17 +154,17 @@
+
+     async def _cache_get(self, key: str) -> Optional[Any]:
+         """Получение данных из кэша"""
+         if not self._redis:
+-            return self._cache_get(key)
++            return self._local_cache_get(key)
+ 
+         try:
+             data = await self._redis.get(key)
+             return json.loads(data) if data else None
+         except Exception:
+-            return self.symbols_cache.get(key)
++            return self._local_cache_get(key)
+ 
+     async def _cache_set(self, key: str, data: Any, ttl: int = CACHE_TTL):
+         """Сохранение данных в кэш"""
+-        self.symbols_cache[key] = data
++        self._local_cache_set(key, data)
+         if self._redis and not self._redis.closed:
+             try:
+                 await self._redis.setex(key, ttl, json.dumps(data))
+@@ -215,7 +215,7 @@
+
+     async def get_spot_symbols(self, quote_coin: str = 'USDT') -> List[str]:
+         """Получение списка спот символов"""
+         cache_key = ("spot", quote_coin.upper())
+-        cached = self._cache_get(cache_key)
++        cached = await self._cache_get(cache_key)
+         if cached:
+             return cached
+ 
+@@ -235,7 +235,7 @@
+
+             ]
+ 
+             symbols = sorted(symbols)
+-            self._cache_set(cache_key, symbols)
++            await self._cache_set(cache_key, symbols)
+             return symbols
+ 
+         except Exception as e:
