@@ -28,6 +28,21 @@ from backend.bybit_client import (
     MarketDataType
 )
 
+# Импорт мощных индикаторов из indicators.py
+from .indicators.indicators import (
+    UltraPerformanceIndicators,
+    PatternType,
+    FibonacciLevel,
+    vectorized_ema_numba,
+    vectorized_rsi_numba,
+    vectorized_macd_numba,
+    vectorized_bollinger_bands_numba,
+    detect_double_top_bottom,
+    detect_head_shoulders,
+    detect_triangle_patterns,
+    detect_support_resistance
+)
+
 logger = logging.getLogger(__name__)
 
 # Конфигурация
@@ -44,17 +59,6 @@ class AnalysisStrategy(Enum):
     TREND = "trend"
     VOLATILITY = "volatility"
     ML_ENHANCED = "ml_enhanced"
-
-
-class PatternType(Enum):
-    """Типы графических паттернов"""
-    DOUBLE_TOP = "double_top"
-    DOUBLE_BOTTOM = "double_bottom"
-    HEAD_SHOULDERS = "head_shoulders"
-    TRIANGLE = "triangle"
-    WEDGE = "wedge"
-    FLAG = "flag"
-    CUP_HANDLE = "cup_handle"
 
 
 class SignalStrength(Enum):
@@ -188,194 +192,88 @@ class UltraAnalysisEngine:
             logger.warning(f"Failed to fetch metadata for {symbol}: {e}")
             return {}
 
-    def _vectorized_ema(self, prices: np.ndarray, period: int) -> np.ndarray:
-        """Векторизованный расчет EMA с оптимизацией NumPy"""
-        if len(prices) < period:
-            return np.full_like(prices, np.nan)
-
-        alpha = 2.0 / (period + 1.0)
-        ema = np.zeros_like(prices)
-        ema[period - 1] = np.mean(prices[:period])
-
-        # Векторизованный расчет
-        for i in range(period, len(prices)):
-            ema[i] = alpha * prices[i] + (1 - alpha) * ema[i - 1]
-
-        return ema
-
-    def _vectorized_rsi(self, prices: np.ndarray, period: int = 14) -> np.ndarray:
-        """Векторизованный расчет RSI с оптимизацией NumPy"""
-        if len(prices) <= period:
-            return np.full_like(prices, np.nan)
-
-        deltas = np.diff(prices)
-        gains = np.where(deltas > 0, deltas, 0.0)
-        losses = np.where(deltas < 0, -deltas, 0.0)
-
-        avg_gain = np.zeros_like(prices)
-        avg_loss = np.zeros_like(prices)
-
-        # Начальные значения
-        avg_gain[period] = np.mean(gains[:period])
-        avg_loss[period] = np.mean(losses[:period])
-
-        # Векторизованное обновление
-        for i in range(period + 1, len(prices)):
-            avg_gain[i] = (avg_gain[i - 1] * (period - 1) + gains[i - 1]) / period
-            avg_loss[i] = (avg_loss[i - 1] * (period - 1) + losses[i - 1]) / period
-
-        rs = np.divide(avg_gain, avg_loss, out=np.ones_like(avg_gain), where=avg_loss != 0)
-        rsi = 100 - (100 / (1 + rs))
-
-        return rsi
-
-    def _vectorized_macd(self, prices: np.ndarray, fast_period: int = 12,
-                         slow_period: int = 26, signal_period: int = 9) -> Dict[str, np.ndarray]:
-        """Векторизованный расчет MACD"""
-        if len(prices) < slow_period + signal_period:
-            return {
-                'macd': np.full_like(prices, np.nan),
-                'signal': np.full_like(prices, np.nan),
-                'histogram': np.full_like(prices, np.nan)
-            }
-
-        ema_fast = self._vectorized_ema(prices, fast_period)
-        ema_slow = self._vectorized_ema(prices, slow_period)
-        macd_line = ema_fast - ema_slow
-        signal_line = self._vectorized_ema(macd_line, signal_period)
-        histogram = macd_line - signal_line
-
-        return {
-            'macd': macd_line,
-            'signal': signal_line,
-            'histogram': histogram
-        }
-
-    def _vectorized_bollinger_bands(self, prices: np.ndarray, period: int = 20,
-                                    std_dev: float = 2.0) -> Dict[str, np.ndarray]:
-        """Векторизованный расчет Bollinger Bands"""
-        if len(prices) < period:
-            return {
-                'upper': np.full_like(prices, np.nan),
-                'middle': np.full_like(prices, np.nan),
-                'lower': np.full_like(prices, np.nan)
-            }
-
-        middle_band = np.zeros_like(prices)
-        upper_band = np.zeros_like(prices)
-        lower_band = np.zeros_like(prices)
-
-        for i in range(period - 1, len(prices)):
-            window = prices[i - period + 1:i + 1]
-            middle_band[i] = np.mean(window)
-            std = np.std(window)
-            upper_band[i] = middle_band[i] + std_dev * std
-            lower_band[i] = middle_band[i] - std_dev * std
-
-        return {
-            'upper': upper_band,
-            'middle': middle_band,
-            'lower': lower_band
-        }
-
-    def _calculate_indicators_vectorized(self, closes: np.ndarray) -> Dict[str, Any]:
-        """Векторизованный расчет всех индикаторов"""
-        if len(closes) < 20:
+    async def calculate_indicators(self, market_data: pd.DataFrame) -> Dict[str, Any]:
+        """Асинхронный расчет технических индикаторов с использованием UltraPerformanceIndicators"""
+        if market_data is None or len(market_data) < 20:
             return {}
 
-        try:
-            # Основные индикаторы
-            ema9 = self._vectorized_ema(closes, 9)
-            ema21 = self._vectorized_ema(closes, 21)
-            ema50 = self._vectorized_ema(closes, 50)
-            ema200 = self._vectorized_ema(closes, 200)
-
-            rsi = self._vectorized_rsi(closes, 14)
-
-            macd_data = self._vectorized_macd(closes)
-            macd_line = macd_data['macd']
-            macd_signal = macd_data['signal']
-            macd_histogram = macd_data['histogram']
-
-            bb_data = self._vectorized_bollinger_bands(closes, 20, 2.0)
-
-            # Дополнительные индикаторы
-            sma20 = np.convolve(closes, np.ones(20) / 20, mode='valid')
-            sma20 = np.concatenate([np.full(len(closes) - len(sma20), np.nan), sma20])
-
-            # Волатильность
-            returns = np.diff(closes) / closes[:-1]
-            volatility = np.std(returns) * np.sqrt(252) * 100 if len(returns) > 1 else 0
-
-            return {
-                'ema9': ema9.tolist(),
-                'ema21': ema21.tolist(),
-                'ema50': ema50.tolist(),
-                'ema200': ema200.tolist(),
-                'rsi': rsi.tolist(),
-                'macd': macd_line.tolist(),
-                'macd_signal': macd_signal.tolist(),
-                'macd_histogram': macd_histogram.tolist(),
-                'bb_upper': bb_data['upper'].tolist(),
-                'bb_middle': bb_data['middle'].tolist(),
-                'bb_lower': bb_data['lower'].tolist(),
-                'sma20': sma20.tolist(),
-                'volatility': float(volatility),
-                'price_change': float((closes[-1] - closes[0]) / closes[0] * 100) if len(closes) > 1 else 0
-            }
-
-        except Exception as e:
-            logger.error(f"Vectorized indicators calculation failed: {e}")
-            return {}
-
-    async def calculate_indicators(self, closes: List[float]) -> Dict[str, Any]:
-        """Асинхронный расчет технических индикаторов"""
-        if len(closes) < 20:
-            return {}
-
-        cache_key = self._cache_key('calculate_indicators', closes)
+        cache_key = self._cache_key('calculate_indicators', market_data.values.tobytes())
         cached = self._get_cached(cache_key, ttl=10)
         if cached:
             return cached
 
         try:
-            closes_np = np.array(closes, dtype=np.float64)
-            indicators = await asyncio.get_event_loop().run_in_executor(
+            # Использование UltraPerformanceIndicators для расчета всех индикаторов
+            indicators_obj = UltraPerformanceIndicators(market_data)
+            all_indicators = await asyncio.get_event_loop().run_in_executor(
                 self.executor,
-                self._calculate_indicators_vectorized,
-                closes_np
+                indicators_obj.get_all_indicators
             )
 
-            self._set_cached(cache_key, indicators)
-            return indicators
+            # Извлечение ключевых индикаторов для совместимости
+            result = {
+                'ema9': all_indicators.get('ema_9', []),
+                'ema21': all_indicators.get('ema_21', []),
+                'ema50': all_indicators.get('ema_50', []),
+                'ema200': all_indicators.get('ema_200', []),
+                'rsi': all_indicators.get('rsi', []),
+                'macd': all_indicators.get('macd_line', []),
+                'macd_signal': all_indicators.get('macd_signal', []),
+                'macd_histogram': all_indicators.get('macd_histogram', []),
+                'bb_upper': all_indicators.get('bb_upper', []),
+                'bb_middle': all_indicators.get('bb_middle', []),
+                'bb_lower': all_indicators.get('bb_lower', []),
+                'sma20': all_indicators.get('sma_20', []),
+                'atr': all_indicators.get('atr', []),
+                'stochastic_k': all_indicators.get('stochastic_k', []),
+                'stochastic_d': all_indicators.get('stochastic_d', []),
+                'obv': all_indicators.get('obv', []),
+                'adx': all_indicators.get('adx', []),
+                'ichimoku_tenkan': all_indicators.get('ichimoku_tenkan', []),
+                'ichimoku_kijun': all_indicators.get('ichimoku_kijun', []),
+                'supertrend': all_indicators.get('supertrend', []),
+                'alligator_jaw': all_indicators.get('alligator_jaw', []),
+                'alligator_teeth': all_indicators.get('alligator_teeth', []),
+                'alligator_lips': all_indicators.get('alligator_lips', []),
+                'volatility': float(
+                    np.std(np.diff(market_data['close'].values) / market_data['close'].values[:-1]) * np.sqrt(
+                        252) * 100) if len(market_data) > 1 else 0,
+                'price_change': float(
+                    (market_data['close'].iloc[-1] - market_data['close'].iloc[0]) / market_data['close'].iloc[
+                        0] * 100) if len(market_data) > 1 else 0
+            }
+
+            self._set_cached(cache_key, result)
+            return result
 
         except Exception as e:
             logger.error(f"Indicators calculation failed: {e}")
             return {}
 
-    def calculate_indicators_sync(self, closes: List[float]) -> Dict[str, Any]:
+    def calculate_indicators_sync(self, market_data: pd.DataFrame) -> Dict[str, Any]:
         """Синхронный расчет технических индикаторов"""
-        return asyncio.run(self.calculate_indicators(closes))
+        return asyncio.run(self.calculate_indicators(market_data))
 
-    async def detect_signals(self, closes: List[float], strategy: str = 'classic') -> Dict[str, Any]:
+    async def detect_signals(self, market_data: pd.DataFrame, strategy: str = 'classic') -> Dict[str, Any]:
         """Обнаружение торговых сигналов на основе индикаторов"""
-        if len(closes) < 20:
+        if market_data is None or len(market_data) < 20:
             return {"alerts": [], "confidence": 0, "strength": 0}
 
-        cache_key = self._cache_key('detect_signals', closes, strategy)
+        cache_key = self._cache_key('detect_signals', market_data.values.tobytes(), strategy)
         cached = self._get_cached(cache_key, ttl=5)
         if cached:
             return cached
 
         try:
             # Получение индикаторов
-            indicators = await self.calculate_indicators(closes)
+            indicators = await self.calculate_indicators(market_data)
             if not indicators:
                 return {"alerts": [], "confidence": 0, "strength": 0}
 
             alerts = []
-            n = len(closes)
+            n = len(market_data)
             confidence_score = 0
+            closes = market_data['close'].values
 
             # Анализ EMA кроссоверов
             ema9 = indicators.get('ema9', [])
@@ -474,6 +372,31 @@ class UltraAnalysisEngine:
                     })
                     confidence_score += 15
 
+            # Анализ Stochastic
+            stochastic_k = indicators.get('stochastic_k', [])
+            stochastic_d = indicators.get('stochastic_d', [])
+
+            if stochastic_k and stochastic_d and len(stochastic_k) > 0 and len(stochastic_d) > 0:
+                if stochastic_k[-1] > 80 and stochastic_d[-1] > 80:
+                    alerts.append({
+                        "type": "STOCHASTIC_OVERBOUGHT",
+                        "idx": n - 1,
+                        "value_k": float(stochastic_k[-1]),
+                        "value_d": float(stochastic_d[-1]),
+                        "strength": SignalStrength.MODERATE.value
+                    })
+                    confidence_score += 10
+
+                elif stochastic_k[-1] < 20 and stochastic_d[-1] < 20:
+                    alerts.append({
+                        "type": "STOCHASTIC_OVERSOLD",
+                        "idx": n - 1,
+                        "value_k": float(stochastic_k[-1]),
+                        "value_d": float(stochastic_d[-1]),
+                        "strength": SignalStrength.MODERATE.value
+                    })
+                    confidence_score += 10
+
             # Расчет итоговой уверенности
             confidence = min(95, confidence_score)
             strength = min(100, len(alerts) * 20)
@@ -493,9 +416,9 @@ class UltraAnalysisEngine:
             logger.error(f"Signal detection failed: {e}")
             return {"alerts": [], "confidence": 0, "strength": 0}
 
-    def detect_signals_sync(self, closes: List[float], strategy: str = 'classic') -> Dict[str, Any]:
+    def detect_signals_sync(self, market_data: pd.DataFrame, strategy: str = 'classic') -> Dict[str, Any]:
         """Синхронное обнаружение торговых сигналов"""
-        return asyncio.run(self.detect_signals(closes, strategy))
+        return asyncio.run(self.detect_signals(market_data, strategy))
 
     async def analyze_symbol(self, symbol: str, market_data: pd.DataFrame = None,
                              interval: str = '15m', limit: int = 500) -> Dict[str, Any]:
@@ -511,20 +434,17 @@ class UltraAnalysisEngine:
             # Получение метаданных
             metadata = await self._fetch_symbol_metadata(symbol)
 
-            # Извлечение цен закрытия
-            closes = market_data['close'].values.tolist()
-
             # Параллельное выполнение анализа
-            indicators_task = self.calculate_indicators(closes)
-            signals_task = self.detect_signals(closes)
+            indicators_task = self.calculate_indicators(market_data)
+            signals_task = self.detect_signals(market_data)
+            patterns_task = self.detect_patterns(market_data)
 
-            indicators, signals = await asyncio.gather(indicators_task, signals_task)
+            indicators, signals, patterns = await asyncio.gather(
+                indicators_task, signals_task, patterns_task
+            )
 
             # Анализ тренда
             trend_analysis = self._analyze_trend(market_data)
-
-            # Обнаружение паттернов
-            patterns = await self.detect_patterns(market_data)
 
             # Расчет потенциала прибыли
             profit_potential = self.calculate_profit_potential(market_data, patterns)
@@ -599,7 +519,7 @@ class UltraAnalysisEngine:
         }
 
     async def detect_patterns(self, market_data: pd.DataFrame) -> List[Dict[str, Any]]:
-        """Обнаружение графических паттернов в рыночных данных"""
+        """Обнаружение графических паттернов в рыночных данных с использованием UltraPerformanceIndicators"""
         if market_data is None or len(market_data) < 50:
             return []
 
@@ -609,22 +529,27 @@ class UltraAnalysisEngine:
             return cached
 
         try:
+            # Использование UltraPerformanceIndicators для обнаружения паттернов
+            indicators_obj = UltraPerformanceIndicators(market_data)
+            patterns_data = await asyncio.get_event_loop().run_in_executor(
+                self.executor,
+                indicators_obj.detect_patterns
+            )
+
             patterns = []
-            closes = market_data['close'].values
-            highs = market_data['high'].values
-            lows = market_data['low'].values
 
-            # Обнаружение Double Top/Bottom
-            double_patterns = self._detect_double_patterns(highs, lows)
-            patterns.extend(double_patterns)
-
-            # Обнаружение треугольников
-            triangles = self._detect_triangles(highs, lows)
-            patterns.extend(triangles)
-
-            # Обнаружение поддержки/сопротивления
-            support_resistance = self._find_support_resistance(closes)
-            patterns.extend(support_resistance)
+            # Преобразование паттернов в единый формат
+            for pattern_type, pattern_list in patterns_data.items():
+                for pattern in pattern_list:
+                    patterns.append({
+                        "type": pattern.get('type', pattern_type),
+                        "confidence": pattern.get('confidence', 'medium'),
+                        "entry_point": pattern.get('entry_point', pattern.get('neckline', 0)),
+                        "target": pattern.get('target', 0),
+                        "stop_loss": pattern.get('stop_loss', 0),
+                        "subtype": pattern.get('subtype', ''),
+                        "breakout_direction": pattern.get('breakout_direction', 'unknown')
+                    })
 
             self._set_cached(cache_key, patterns)
             return patterns
@@ -636,131 +561,6 @@ class UltraAnalysisEngine:
     def detect_patterns_sync(self, market_data: pd.DataFrame) -> List[Dict[str, Any]]:
         """Синхронное обнаружение паттернов"""
         return asyncio.run(self.detect_patterns(market_data))
-
-    def _detect_double_patterns(self, highs: np.ndarray, lows: np.ndarray) -> List[Dict[str, Any]]:
-        """Обнаружение паттернов Double Top и Double Bottom"""
-        patterns = []
-        n = len(highs)
-
-        if n < 20:
-            return patterns
-
-        # Поиск локальных экстремумов
-        local_maxima = []
-        local_minima = []
-
-        for i in range(5, n - 5):
-            if highs[i] == max(highs[i - 5:i + 6]):
-                local_maxima.append((i, highs[i]))
-            if lows[i] == min(lows[i - 5:i + 6]):
-                local_minima.append((i, lows[i]))
-
-        # Поиск Double Top
-        for i in range(len(local_maxima) - 1):
-            idx1, price1 = local_maxima[i]
-            idx2, price2 = local_maxima[i + 1]
-
-            if (0.98 <= price2 / price1 <= 1.02 and  # Цены примерно равны
-                    abs(idx2 - idx1) <= 20 and  # Не слишком далеко
-                    price1 > max(highs[idx1 - 10:idx1]) and  # Явный максимум
-                    price2 > max(highs[idx2 - 10:idx2])):
-                patterns.append({
-                    "type": PatternType.DOUBLE_TOP.value,
-                    "confidence": "high",
-                    "entry_point": float(np.mean(lows[idx1:idx2])),
-                    "target": float(price1 - (price1 - np.mean(lows[idx1:idx2]))),
-                    "stop_loss": float(price1 * 1.02)
-                })
-
-        # Поиск Double Bottom
-        for i in range(len(local_minima) - 1):
-            idx1, price1 = local_minima[i]
-            idx2, price2 = local_minima[i + 1]
-
-            if (0.98 <= price2 / price1 <= 1.02 and  # Цены примерно равны
-                    abs(idx2 - idx1) <= 20 and  # Не слишком далеко
-                    price1 < min(lows[idx1 - 10:idx1]) and  # Явный минимум
-                    price2 < min(lows[idx2 - 10:idx2])):
-                patterns.append({
-                    "type": PatternType.DOUBLE_BOTTOM.value,
-                    "confidence": "high",
-                    "entry_point": float(np.mean(highs[idx1:idx2])),
-                    "target": float(price1 + (np.mean(highs[idx1:idx2]) - price1)),
-                    "stop_loss": float(price1 * 0.98)
-                })
-
-        return patterns
-
-    def _detect_triangles(self, highs: np.ndarray, lows: np.ndarray) -> List[Dict[str, Any]]:
-        """Обнаружение треугольных паттернов"""
-        patterns = []
-        n = len(highs)
-
-        if n < 30:
-            return patterns
-
-        # Упрощенное обнаружение треугольников
-        recent_highs = highs[-20:]
-        recent_lows = lows[-20:]
-
-        high_slope = np.polyfit(range(20), recent_highs, 1)[0]
-        low_slope = np.polyfit(range(20), recent_lows, 1)[0]
-
-        # Сходящийся треугольник
-        if high_slope < 0 and low_slope > 0:
-            patterns.append({
-                "type": PatternType.TRIANGLE.value,
-                "subtype": "symmetrical",
-                "confidence": "medium",
-                "breakout_direction": "unknown"
-            })
-
-        # Восходящий треугольник
-        elif abs(high_slope) < 0.1 and low_slope > 0:
-            patterns.append({
-                "type": PatternType.TRIANGLE.value,
-                "subtype": "ascending",
-                "confidence": "medium",
-                "breakout_direction": "bullish"
-            })
-
-        # Нисходящий треугольник
-        elif abs(low_slope) < 0.1 and high_slope < 0:
-            patterns.append({
-                "type": PatternType.TRIANGLE.value,
-                "subtype": "descending",
-                "confidence": "medium",
-                "breakout_direction": "bearish"
-            })
-
-        return patterns
-
-    def _find_support_resistance(self, prices: np.ndarray, window: int = 20) -> List[Dict[str, Any]]:
-        """Поиск уровней поддержки и сопротивления"""
-        levels = []
-        n = len(prices)
-
-        if n < window * 2:
-            return levels
-
-        # Поиск значимых уровней
-        for i in range(window, n - window):
-            if prices[i] == max(prices[i - window:i + window + 1]):
-                levels.append({
-                    "type": "resistance",
-                    "price": float(prices[i]),
-                    "strength": "strong",
-                    "timestamp": i
-                })
-            elif prices[i] == min(prices[i - window:i + window + 1]):
-                levels.append({
-                    "type": "support",
-                    "price": float(prices[i]),
-                    "strength": "strong",
-                    "timestamp": i
-                })
-
-        return levels[-10:]  # Последние 10 уровней
 
     def calculate_profit_potential(self, market_data: pd.DataFrame,
                                    patterns: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -839,14 +639,14 @@ async def close_analysis_engine():
 
 
 # Асинхронные функции
-async def detect_signals(closes: List[float], strategy: str = 'classic') -> Dict[str, Any]:
+async def detect_signals(market_data: pd.DataFrame, strategy: str = 'classic') -> Dict[str, Any]:
     """Асинхронное обнаружение торговых сигналов"""
-    return await analysis_engine.detect_signals(closes, strategy)
+    return await analysis_engine.detect_signals(market_data, strategy)
 
 
-async def calculate_indicators(closes: List[float]) -> Dict[str, Any]:
+async def calculate_indicators(market_data: pd.DataFrame) -> Dict[str, Any]:
     """Асинхронный расчет технических индикаторов"""
-    return await analysis_engine.calculate_indicators(closes)
+    return await analysis_engine.calculate_indicators(market_data)
 
 
 async def analyze_symbol(symbol: str, market_data: pd.DataFrame = None,
@@ -868,15 +668,15 @@ async def calculate_profit_potential(market_data: pd.DataFrame,
 
 # Синхронные функции
 @async_to_sync
-def detect_signals_sync(closes: List[float], strategy: str = 'classic') -> Dict[str, Any]:
+def detect_signals_sync(market_data: pd.DataFrame, strategy: str = 'classic') -> Dict[str, Any]:
     """Синхронное обнаружение торговых сигналов"""
-    return detect_signals(closes, strategy)
+    return detect_signals(market_data, strategy)
 
 
 @async_to_sync
-def calculate_indicators_sync(closes: List[float]) -> Dict[str, Any]:
+def calculate_indicators_sync(market_data: pd.DataFrame) -> Dict[str, Any]:
     """Синхронный расчет технических индикаторов"""
-    return calculate_indicators(closes)
+    return calculate_indicators(market_data)
 
 
 @async_to_sync
