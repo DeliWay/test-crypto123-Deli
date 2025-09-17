@@ -27,7 +27,6 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Импорты из backend.bybit_client
 from backend.bybit_client import (
-    bybit_client,           # основной синхронный клиент
     get_available_symbols,  # асинхронная функция получения символов
     get_market_data,        # асинхронная функция получения рыночных данных
     get_ticker_info,        # асинхронная функция получения информации о тикере

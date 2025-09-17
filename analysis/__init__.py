@@ -1,24 +1,61 @@
+# analysis/__init__.py
 """
-Пакет технического анализа
+ULTRA-PERFORMANCE TECHNICAL ANALYSIS MODULE
+Унифицированные синхронные и асинхронные интерфейсы
+Реальные рыночные данные без заглушек
+Многократное улучшение производительности и точности
 """
 
-from typing import List, Dict, Any  # ← ДОБАВЬ ЭТОТ ИМПОРТ
+from .analysis_engine import (
+    # Основные классы
+    UltraAnalysisEngine,
+    analysis_engine,
 
-from .analysis_engine import detect_signals_sync, calculate_indicators_sync, analysis_engine
+    # Асинхронные функции
+    detect_signals,
+    calculate_indicators,
+    analyze_symbol,
+    detect_patterns,
+    calculate_profit_potential,
+
+    # Синхронные функции
+    detect_signals_sync,
+    calculate_indicators_sync,
+    analyze_symbol_sync,
+    detect_patterns_sync,
+    calculate_profit_potential_sync,
+
+    # Утилиты
+    init_analysis_engine,
+    close_analysis_engine,
+
+    # Константы
+    AnalysisStrategy,
+    PatternType,
+    SignalStrength
+)
+
 from . import indicators
 from . import signals
 
-# Экспорт основных функций для обратной совместимости
-def detect_signals(closes: List[float], strategy: str = 'classic') -> Dict[str, Any]:
-    """Обнаружение сигналов (совместимость со старым кодом)"""
-    return detect_signals_sync(closes, strategy)
-
-# Реэкспорт функций
 __all__ = [
-    'detect_signals_sync',
-    'calculate_indicators_sync', 
+    'UltraAnalysisEngine',
     'analysis_engine',
+    'detect_signals',
+    'calculate_indicators',
+    'analyze_symbol',
+    'detect_patterns',
+    'calculate_profit_potential',
+    'detect_signals_sync',
+    'calculate_indicators_sync',
+    'analyze_symbol_sync',
+    'detect_patterns_sync',
+    'calculate_profit_potential_sync',
+    'init_analysis_engine',
+    'close_analysis_engine',
+    'AnalysisStrategy',
+    'PatternType',
+    'SignalStrength',
     'indicators',
-    'signals',
-    'detect_signals'  # для обратной совместимости
+    'signals'
 ]
