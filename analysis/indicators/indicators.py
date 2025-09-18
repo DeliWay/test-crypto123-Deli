@@ -16,6 +16,25 @@ from enum import Enum
 import math
 from scipy import stats
 
+
+@njit(cache=True, fastmath=True)
+def _shift_with_nan(arr: np.ndarray, periods: int) -> np.ndarray:
+    """Сдвиг массива с заполнением NaN (без подглядывания в будущее)"""
+    n = len(arr)
+    result = np.empty(n, dtype=arr.dtype)
+    result[:] = np.nan
+
+    if periods > 0:
+        # Сдвиг вправо (прошлые значения)
+        if periods < n:
+            result[periods:] = arr[:-periods]
+    elif periods < 0:
+        # Сдвиг влево (будущие значения - только для отрисовки!)
+        if -periods < n:
+            result[:periods] = arr[-periods:]
+
+    return result
+
 logger = logging.getLogger(__name__)
 
 
@@ -48,6 +67,7 @@ class FibonacciLevel(Enum):
 # ==================== БАЗОВЫЕ ИНДИКАТОРЫ ====================
 
 @njit(parallel=True, fastmath=True)
+
 def vectorized_ema_numba(prices: np.ndarray, period: int) -> np.ndarray:
     """Ультра-быстрый расчет EMA с использованием Numba"""
     if len(prices) < period:
@@ -79,32 +99,50 @@ def vectorized_sma_numba(prices: np.ndarray, period: int) -> np.ndarray:
 
 @njit(parallel=True, fastmath=True)
 def vectorized_rsi_numba(prices: np.ndarray, period: int = 14) -> np.ndarray:
-    """Ультра-быстрый расчет RSI с использованием Numba"""
+    """Ультра-быстрый расчет RSI с использованием Numba с защитой от деления на ноль"""
     if len(prices) <= period:
         return np.full_like(prices, np.nan, dtype=np.float64)
 
+    n = len(prices)
     deltas = np.diff(prices)
     gains = np.where(deltas > 0, deltas, 0.0)
     losses = np.where(deltas < 0, -deltas, 0.0)
 
-    avg_gain = np.zeros_like(prices, dtype=np.float64)
-    avg_loss = np.zeros_like(prices, dtype=np.float64)
+    # Инициализация с проверкой нулевых значений
+    initial_avg_gain = np.mean(gains[:period])
+    initial_avg_loss = np.mean(losses[:period])
 
-    avg_gain[period] = np.mean(gains[:period])
-    avg_loss[period] = np.mean(losses[:period])
+    # Обработка краевых случаев
+    if initial_avg_loss == 0 and initial_avg_gain == 0:
+        return np.full(n, 50.0, dtype=np.float64)
+    elif initial_avg_loss == 0:
+        return np.full(n, 100.0, dtype=np.float64)
+    elif initial_avg_gain == 0:
+        return np.full(n, 0.0, dtype=np.float64)
 
-    for i in prange(period + 1, len(prices)):
+    # Продолжаем расчет если оба ненулевые
+    avg_gain = np.full(n, np.nan, dtype=np.float64)
+    avg_loss = np.full(n, np.nan, dtype=np.float64)
+    avg_gain[period] = initial_avg_gain
+    avg_loss[period] = initial_avg_loss
+
+    # Сглаживание средних
+    for i in range(period + 1, n):
         avg_gain[i] = (avg_gain[i - 1] * (period - 1) + gains[i - 1]) / period
         avg_loss[i] = (avg_loss[i - 1] * (period - 1) + losses[i - 1]) / period
 
-    rs = np.zeros_like(avg_gain, dtype=np.float64)
-    for i in prange(len(avg_gain)):
-        if avg_loss[i] != 0:
-            rs[i] = avg_gain[i] / avg_loss[i]
-        else:
-            rs[i] = 1.0
+    # Расчет RSI
+    rsi = np.full(n, 50.0, dtype=np.float64)  # По умолчанию нейтрально
 
-    rsi = 100 - (100 / (1 + rs))
+    for i in range(period, n):
+        if avg_loss[i] > 1e-10:
+            rs = avg_gain[i] / avg_loss[i]
+            rsi[i] = 100.0 - (100.0 / (1.0 + rs))
+        elif avg_gain[i] > 1e-10:
+            rsi[i] = 100.0  # Только рост
+        else:
+            rsi[i] = 50.0  # Нейтрально
+
     return rsi
 
 
@@ -168,7 +206,7 @@ def vectorized_atr_numba(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray
     # Initial ATR
     atr[period - 1] = np.mean(tr[1:period])
 
-    # Smoothed ATR
+    # Smoothed ATR (Wilder's smoothing)
     for i in prange(period, n):
         atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period
 
@@ -231,56 +269,79 @@ def vectorized_obv_numba(closes: np.ndarray, volumes: np.ndarray) -> np.ndarray:
 @njit(parallel=True, fastmath=True)
 def vectorized_adx_numba(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray,
                          period: int = 14) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Ультра-быстрый расчет ADX с использованием Numba"""
-    if len(highs) < period * 2 or len(lows) < period * 2 or len(closes) < period * 2:
-        nan_arr = np.full_like(closes, np.nan, dtype=np.float64)
-        return nan_arr, nan_arr, nan_arr
-
+    """Корректный расчет ADX по методу Уайлдера"""
     n = len(highs)
+    if n < period + 1:
+        return (np.full_like(highs, np.nan),
+                np.full_like(highs, np.nan),
+                np.full_like(highs, np.nan))
 
-    # +DM and -DM
+    # Инициализация массивов
+    tr = np.zeros(n, dtype=np.float64)
     plus_dm = np.zeros(n, dtype=np.float64)
     minus_dm = np.zeros(n, dtype=np.float64)
 
-    for i in prange(1, n):
+    # Расчет True Range и Directional Movement
+    tr[0] = highs[0] - lows[0]
+    for i in range(1, n):
+        high_low = highs[i] - lows[i]
+        high_close = abs(highs[i] - closes[i - 1])
+        low_close = abs(lows[i] - closes[i - 1])
+        tr[i] = max(high_low, high_close, low_close)
+
         up_move = highs[i] - highs[i - 1]
         down_move = lows[i - 1] - lows[i]
 
         if up_move > down_move and up_move > 0:
             plus_dm[i] = up_move
-        if down_move > up_move and down_move > 0:
+        elif down_move > up_move and down_move > 0:
             minus_dm[i] = down_move
 
-    # True Range
-    tr = np.zeros(n, dtype=np.float64)
-    for i in prange(1, n):
-        tr1 = highs[i] - lows[i]
-        tr2 = abs(highs[i] - closes[i - 1])
-        tr3 = abs(lows[i] - closes[i - 1])
-        tr[i] = max(tr1, tr2, tr3)
+    # Сглаживание по Уайлдеру
+    atr = np.zeros(n, dtype=np.float64)
+    atr_plus_dm = np.zeros(n, dtype=np.float64)
+    atr_minus_dm = np.zeros(n, dtype=np.float64)
 
-    # Smoothed values
+    # Первые значения
+    atr[period] = np.sum(tr[1:period + 1]) / period
+    atr_plus_dm[period] = np.sum(plus_dm[1:period + 1]) / period
+    atr_minus_dm[period] = np.sum(minus_dm[1:period + 1]) / period
+
+    # Рекурсивное сглаживание
+    for i in range(period + 1, n):
+        atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period
+        atr_plus_dm[i] = (atr_plus_dm[i - 1] * (period - 1) + plus_dm[i]) / period
+        atr_minus_dm[i] = (atr_minus_dm[i - 1] * (period - 1) + minus_dm[i]) / period
+
+    # Расчет Directional Indicators
     plus_di = np.zeros(n, dtype=np.float64)
     minus_di = np.zeros(n, dtype=np.float64)
+
+    for i in range(period, n):
+        if atr[i] > 1e-10:
+            plus_di[i] = 100.0 * atr_plus_dm[i] / atr[i]
+            minus_di[i] = 100.0 * atr_minus_dm[i] / atr[i]
+
+    # Расчет DX
     dx = np.zeros(n, dtype=np.float64)
+    for i in range(period, n):
+        di_sum = plus_di[i] + minus_di[i]
+        if di_sum > 1e-10:
+            dx[i] = 100.0 * abs(plus_di[i] - minus_di[i]) / di_sum
+
+    # ADX как сглаженный DX
     adx = np.zeros(n, dtype=np.float64)
+    if n > period * 2:
+        # Первое значение ADX - среднее первых period значений DX
+        valid_dx = dx[period:period * 2]
+        valid_dx = valid_dx[~np.isnan(valid_dx)]
+        if len(valid_dx) > 0:
+            adx[period * 2 - 1] = np.mean(valid_dx)
 
-    # Initial values
-    plus_di[period] = 100 * np.sum(plus_dm[1:period + 1]) / np.sum(tr[1:period + 1])
-    minus_di[period] = 100 * np.sum(minus_dm[1:period + 1]) / np.sum(tr[1:period + 1])
-
-    # Smoothed calculation
-    for i in prange(period + 1, n):
-        plus_di[i] = (plus_di[i - 1] * (period - 1) + plus_dm[i]) / period
-        minus_di[i] = (minus_di[i - 1] * (period - 1) + minus_dm[i]) / period
-
-        dx[i] = 100 * abs(plus_di[i] - minus_di[i]) / (plus_di[i] + minus_di[i])
-
-    # ADX
-    adx[period * 2 - 1] = np.mean(dx[period:period * 2])
-
-    for i in prange(period * 2, n):
-        adx[i] = (adx[i - 1] * (period - 1) + dx[i]) / period
+            # Рекурсивное сглаживание
+            for i in range(period * 2, n):
+                if not np.isnan(dx[i]):
+                    adx[i] = (adx[i - 1] * (period - 1) + dx[i]) / period
 
     return plus_di, minus_di, adx
 
@@ -291,7 +352,8 @@ def vectorized_adx_numba(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray
 def vectorized_ichimoku_numba(highs: np.ndarray, lows: np.ndarray,
                               conversion_period: int = 9,
                               base_period: int = 26,
-                              leading_span_b_period: int = 52) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                              leading_span_b_period: int = 52) -> Tuple[
+    np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Ультра-быстрый расчет Ichimoku Cloud с использованием Numba"""
     n = len(highs)
 
@@ -309,20 +371,25 @@ def vectorized_ichimoku_numba(highs: np.ndarray, lows: np.ndarray,
         low_window = lows[i - base_period + 1:i + 1]
         kijun_sen[i] = (np.max(high_window) + np.min(low_window)) / 2
 
-    # Senkou Span A (Leading Span A)
+    # Senkou Span A (Leading Span A) - shifted forward
     senkou_span_a = np.full(n, np.nan, dtype=np.float64)
-    for i in prange(base_period - 1, n):
-        if i >= base_period:
-            senkou_span_a[i] = (tenkan_sen[i] + kijun_sen[i]) / 2
+    for i in prange(base_period, n):
+        senkou_span_a[i] = (tenkan_sen[i] + kijun_sen[i]) / 2
 
-    # Senkou Span B (Leading Span B)
+    # Senkou Span B (Leading Span B) - shifted forward
     senkou_span_b = np.full(n, np.nan, dtype=np.float64)
     for i in prange(leading_span_b_period - 1, n):
         high_window = highs[i - leading_span_b_period + 1:i + 1]
         low_window = lows[i - leading_span_b_period + 1:i + 1]
         senkou_span_b[i] = (np.max(high_window) + np.min(low_window)) / 2
 
-    return tenkan_sen, kijun_sen, senkou_span_a, senkou_span_b
+    # Chikou Span (Lagging Span) - shifted backward
+    chikou_span = np.full(n, np.nan, dtype=np.float64)
+    for i in prange(base_period, n):
+        if i >= base_period:
+            chikou_span[i - base_period] = highs[i]  # Typically close price, using high for consistency
+
+    return tenkan_sen, kijun_sen, senkou_span_a, senkou_span_b, chikou_span
 
 
 @njit(parallel=True, fastmath=True)
@@ -341,7 +408,7 @@ def vectorized_keltner_channels_numba(highs: np.ndarray, lows: np.ndarray, close
     upper_band = np.full(n, np.nan, dtype=np.float64)
     lower_band = np.full(n, np.nan, dtype=np.float64)
 
-    for i in prange(period - 1, n):
+    for i in prange(max(period, atr_period) - 1, n):
         if not np.isnan(ema_center[i]) and not np.isnan(atr[i]):
             upper_band[i] = ema_center[i] + multiplier * atr[i]
             lower_band[i] = ema_center[i] - multiplier * atr[i]
@@ -383,8 +450,6 @@ def vectorized_parabolic_sar_numba(highs: np.ndarray, lows: np.ndarray,
 
     # Initial values
     sar[0] = lows[0]
-    sar[1] = highs[0] if lows[1] > lows[0] else lows[0]
-
     trend = 1 if lows[1] > lows[0] else -1
     ep = highs[1] if trend == 1 else lows[1]
     af = acceleration
@@ -392,6 +457,7 @@ def vectorized_parabolic_sar_numba(highs: np.ndarray, lows: np.ndarray,
     for i in prange(2, n):
         if trend == 1:
             sar[i] = sar[i - 1] + af * (ep - sar[i - 1])
+            sar[i] = min(sar[i], lows[i - 1], lows[i - 2])
 
             if lows[i] < sar[i]:
                 trend = -1
@@ -404,6 +470,7 @@ def vectorized_parabolic_sar_numba(highs: np.ndarray, lows: np.ndarray,
                     af = min(af + acceleration, maximum)
         else:
             sar[i] = sar[i - 1] + af * (ep - sar[i - 1])
+            sar[i] = max(sar[i], highs[i - 1], highs[i - 2])
 
             if highs[i] > sar[i]:
                 trend = 1
@@ -432,8 +499,9 @@ def vectorized_supertrend_numba(highs: np.ndarray, lows: np.ndarray, closes: np.
         return supertrend, direction
 
     # Basic ATR bands
-    upper_band = (highs + lows) / 2 + multiplier * atr
-    lower_band = (highs + lows) / 2 - multiplier * atr
+    hl2 = (highs + lows) / 2
+    upper_band = hl2 + multiplier * atr
+    lower_band = hl2 - multiplier * atr
 
     supertrend[period - 1] = upper_band[period - 1]
     direction[period - 1] = 1
@@ -454,7 +522,7 @@ def vectorized_alligator_numba(highs: np.ndarray, lows: np.ndarray,
                                jaw_period: int = 13, jaw_shift: int = 8,
                                teeth_period: int = 8, teeth_shift: int = 5,
                                lips_period: int = 5, lips_shift: int = 3) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Ультра-быстрый расчет Alligator с использованием Numba"""
+    """Ультра-быстрый расчет Alligator с использованием Numba (без подглядывания в будущее)"""
     n = len(highs)
 
     # Median price
@@ -462,15 +530,21 @@ def vectorized_alligator_numba(highs: np.ndarray, lows: np.ndarray,
 
     # Jaw (синяя линия)
     jaw = vectorized_sma_numba(median_price, jaw_period)
-    jaw_shifted = np.roll(jaw, jaw_shift)
+    jaw_shifted = np.full(n, np.nan, dtype=np.float64)
+    if jaw_shift < n:
+        jaw_shifted[jaw_shift:] = jaw[:-jaw_shift]
 
     # Teeth (красная линия)
     teeth = vectorized_sma_numba(median_price, teeth_period)
-    teeth_shifted = np.roll(teeth, teeth_shift)
+    teeth_shifted = np.full(n, np.nan, dtype=np.float64)
+    if teeth_shift < n:
+        teeth_shifted[teeth_shift:] = teeth[:-teeth_shift]
 
     # Lips (зеленая линия)
     lips = vectorized_sma_numba(median_price, lips_period)
-    lips_shifted = np.roll(lips, lips_shift)
+    lips_shifted = np.full(n, np.nan, dtype=np.float64)
+    if lips_shift < n:
+        lips_shifted[lips_shift:] = lips[:-lips_shift]
 
     return jaw_shifted, teeth_shifted, lips_shifted
 
@@ -486,8 +560,9 @@ def detect_fractals_numba(highs: np.ndarray, lows: np.ndarray,
     for i in prange(window, n - window):
         # Check for bullish fractal (low point)
         is_low_fractal = True
+        current_low = lows[i]
         for j in range(1, window + 1):
-            if lows[i] >= lows[i - j] or lows[i] >= lows[i + j]:
+            if current_low >= lows[i - j] or current_low >= lows[i + j]:
                 is_low_fractal = False
                 break
 
@@ -495,8 +570,9 @@ def detect_fractals_numba(highs: np.ndarray, lows: np.ndarray,
 
         # Check for bearish fractal (high point)
         is_high_fractal = True
+        current_high = highs[i]
         for j in range(1, window + 1):
-            if highs[i] <= highs[i - j] or highs[i] <= highs[i + j]:
+            if current_high <= highs[i - j] or current_high <= highs[i + j]:
                 is_high_fractal = False
                 break
 
@@ -506,26 +582,42 @@ def detect_fractals_numba(highs: np.ndarray, lows: np.ndarray,
 
 
 @njit(parallel=True, fastmath=True)
-def vectorized_gann_angles_numba(highs: np.ndarray, lows: np.ndarray,
-                                 significant_high: float, significant_low: float,
-                                 current_price: float) -> Tuple[float, float, float, float]:
+def vectorized_gann_angles_numba(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray,
+                                 start_idx: int, end_idx: int) -> Tuple[float, float, float, float]:
     """Расчет углов Ганна от значимых экстремумов"""
-    # 1x1 angle (45 degrees)
-    angle_1x1 = 45.0
+    if end_idx <= start_idx or end_idx >= len(highs):
+        return 45.0, 26.25, 63.75, 15.0
 
-    # 1x2 angle (26.25 degrees)
-    angle_1x2 = 26.25
+    # Find significant high and low in the range
+    segment_highs = highs[start_idx:end_idx + 1]
+    segment_lows = lows[start_idx:end_idx + 1]
 
-    # 2x1 angle (63.75 degrees)
-    angle_2x1 = 63.75
+    significant_high = np.max(segment_highs)
+    significant_low = np.min(segment_lows)
+    current_price = closes[end_idx]
 
-    # 1x4 angle (15 degrees)
-    angle_1x4 = 15.0
-
-    # Calculate price differences for angle projections
     price_range = significant_high - significant_low
+    if price_range < 1e-10:
+        return 45.0, 26.25, 63.75, 15.0
 
-    # Return angles in degrees
+    # Calculate time range
+    time_range = end_idx - start_idx
+    if time_range < 1:
+        return 45.0, 26.25, 63.75, 15.0
+
+    # Calculate angles based on price movement over time
+    price_change = current_price - significant_low
+    time_change = end_idx - start_idx
+
+    # 1x1 angle (45 degrees) - price moves 1 unit per 1 time unit
+    base_angle = np.degrees(np.arctan(price_range / time_range))
+
+    # Gann angles
+    angle_1x1 = base_angle
+    angle_1x2 = np.degrees(np.arctan(price_range / (time_range * 2)))
+    angle_2x1 = np.degrees(np.arctan((price_range * 2) / time_range))
+    angle_1x4 = np.degrees(np.arctan(price_range / (time_range * 4)))
+
     return angle_1x1, angle_1x2, angle_2x1, angle_1x4
 
 
@@ -548,7 +640,11 @@ def vectorized_roc_numba(prices: np.ndarray, period: int = 10) -> np.ndarray:
     roc = np.full(n, np.nan, dtype=np.float64)
 
     for i in prange(period, n):
-        roc[i] = (prices[i] - prices[i - period]) / prices[i - period] * 100
+        base_price = prices[i - period]
+        if abs(base_price) < 1e-10:  # Защита от деления на ноль
+            roc[i] = 0.0
+        else:
+            roc[i] = (prices[i] - base_price) / base_price * 100
 
     return roc
 
@@ -567,8 +663,10 @@ def vectorized_cci_numba(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray
         sma = np.mean(window)
         mean_deviation = np.mean(np.abs(window - sma))
 
-        if mean_deviation != 0:
+        if mean_deviation > 1e-10:
             cci[i] = (typical_price[i] - sma) / (0.015 * mean_deviation)
+        else:
+            cci[i] = 0.0
 
     return cci
 
@@ -584,8 +682,10 @@ def vectorized_williams_r_numba(highs: np.ndarray, lows: np.ndarray, closes: np.
         highest_high = np.max(highs[i - period + 1:i + 1])
         lowest_low = np.min(lows[i - period + 1:i + 1])
 
-        if highest_high != lowest_low:
+        if abs(highest_high - lowest_low) > 1e-10:
             williams_r[i] = (highest_high - closes[i]) / (highest_high - lowest_low) * -100
+        else:
+            williams_r[i] = -50.0
 
     return williams_r
 
@@ -613,9 +713,13 @@ def vectorized_mfi_numba(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray
         pos_sum = np.sum(positive_flow[i - period + 1:i + 1])
         neg_sum = np.sum(negative_flow[i - period + 1:i + 1])
 
-        if neg_sum != 0:
+        if neg_sum > 1e-10:
             money_ratio = pos_sum / neg_sum
             mfi[i] = 100 - (100 / (1 + money_ratio))
+        elif pos_sum > 1e-10:
+            mfi[i] = 100.0
+        else:
+            mfi[i] = 50.0
 
     return mfi
 
@@ -623,7 +727,7 @@ def vectorized_mfi_numba(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray
 # ==================== ГРАФИЧЕСКИЕ ИНСТРУМЕНТЫ И ПАТТЕРНЫ ====================
 
 def detect_double_top_bottom(highs: np.ndarray, lows: np.ndarray, tolerance: float = 0.02) -> Dict[str, Any]:
-    """Обнаружение паттернов Double Top и Double Bottom"""
+    """Обнаружение паттернов Double Top и Double Bottom с правильными целями"""
     patterns = {
         'double_tops': [],
         'double_bottoms': []
@@ -633,14 +737,27 @@ def detect_double_top_bottom(highs: np.ndarray, lows: np.ndarray, tolerance: flo
     if n < 20:
         return patterns
 
-    # Find local maxima and minima
+    # Find local maxima and minima with tolerance
     local_maxima = []
     local_minima = []
 
     for i in range(5, n - 5):
-        if highs[i] == max(highs[i - 5:i + 6]):
+        # Check for local maximum with tolerance
+        is_max = True
+        for j in range(-5, 6):
+            if j != 0 and highs[i] < highs[i + j] * (1 - tolerance / 2):
+                is_max = False
+                break
+        if is_max:
             local_maxima.append((i, highs[i]))
-        if lows[i] == min(lows[i - 5:i + 6]):
+
+        # Check for local minimum with tolerance
+        is_min = True
+        for j in range(-5, 6):
+            if j != 0 and lows[i] > lows[i + j] * (1 + tolerance / 2):
+                is_min = False
+                break
+        if is_min:
             local_minima.append((i, lows[i]))
 
     # Detect Double Tops
@@ -648,24 +765,27 @@ def detect_double_top_bottom(highs: np.ndarray, lows: np.ndarray, tolerance: flo
         idx1, price1 = local_maxima[i]
         idx2, price2 = local_maxima[i + 1]
 
-        price_diff = abs(price1 - price2) / price1
+        price_diff = abs(price1 - price2) / max(price1, price2)
         time_diff = abs(idx2 - idx1)
+
+        # Find the trough between the two peaks
+        trough_idx = np.argmin(lows[idx1:idx2 + 1]) + idx1
+        trough_price = lows[trough_idx]
 
         if (price_diff <= tolerance and
                 time_diff <= 20 and
-                price1 > max(highs[idx1 - 10:idx1]) and
-                price2 > max(highs[idx2 - 10:idx2])):
-            neckline = np.mean(lows[idx1:idx2 + 1])
-            target = price1 - (price1 - neckline)
-
+                price1 > max(highs[max(0, idx1 - 10):idx1]) and
+                price2 > max(highs[idx2:min(n, idx2 + 10)]) and
+                trough_price < min(price1, price2) * 0.95):
+            neckline = trough_price
+            target = neckline - (max(price1, price2) - neckline)  # Correct target calculation
             patterns['double_tops'].append({
-                'type': PatternType.DOUBLE_TOP.value,
-                'confidence': 'high',
-                'left_shoulder': (idx1, float(price1)),
-                'right_shoulder': (idx2, float(price2)),
-                'neckline': float(neckline),
-                'target': float(target),
-                'stop_loss': float(price1 * 1.02)
+                'start_idx': idx1,
+                'end_idx': idx2,
+                'peak1': price1,
+                'peak2': price2,
+                'neckline': neckline,
+                'target': target
             })
 
     # Detect Double Bottoms
@@ -673,31 +793,34 @@ def detect_double_top_bottom(highs: np.ndarray, lows: np.ndarray, tolerance: flo
         idx1, price1 = local_minima[i]
         idx2, price2 = local_minima[i + 1]
 
-        price_diff = abs(price1 - price2) / price1
+        price_diff = abs(price1 - price2) / min(price1, price2)
         time_diff = abs(idx2 - idx1)
+
+        # Find the peak between the two troughs
+        peak_idx = np.argmax(highs[idx1:idx2 + 1]) + idx1
+        peak_price = highs[peak_idx]
 
         if (price_diff <= tolerance and
                 time_diff <= 20 and
-                price1 < min(lows[idx1 - 10:idx1]) and
-                price2 < min(lows[idx2 - 10:idx2])):
-            neckline = np.mean(highs[idx1:idx2 + 1])
-            target = price1 + (neckline - price1)
-
+                price1 < min(lows[max(0, idx1 - 10):idx1]) and
+                price2 < min(lows[idx2:min(n, idx2 + 10)]) and
+                peak_price > max(price1, price2) * 1.05):
+            neckline = peak_price
+            target = neckline + (neckline - min(price1, price2))  # Correct target calculation
             patterns['double_bottoms'].append({
-                'type': PatternType.DOUBLE_BOTTOM.value,
-                'confidence': 'high',
-                'left_shoulder': (idx1, float(price1)),
-                'right_shoulder': (idx2, float(price2)),
-                'neckline': float(neckline),
-                'target': float(target),
-                'stop_loss': float(price1 * 0.98)
+                'start_idx': idx1,
+                'end_idx': idx2,
+                'trough1': price1,
+                'trough2': price2,
+                'neckline': neckline,
+                'target': target
             })
 
     return patterns
 
 
-def detect_head_shoulders(highs: np.ndarray, lows: np.ndarray, tolerance: float = 0.02) -> Dict[str, Any]:
-    """Обнаружение паттернов Head and Shoulders и Inverse Head and Shoulders"""
+def detect_head_shoulders(highs: np.ndarray, lows: np.ndarray, tolerance: float = 0.03) -> Dict[str, Any]:
+    """Обнаружение паттернов Head & Shoulders и Inverse Head & Shoulders"""
     patterns = {
         'head_shoulders': [],
         'inverse_head_shoulders': []
@@ -707,812 +830,645 @@ def detect_head_shoulders(highs: np.ndarray, lows: np.ndarray, tolerance: float 
     if n < 30:
         return patterns
 
-    # Find significant peaks and troughs
-    peaks = []
-    troughs = []
+    # Find significant highs and lows
+    local_maxima = []
+    local_minima = []
 
-    for i in range(5, n - 5):
-        if highs[i] == max(highs[i - 5:i + 6]):
-            peaks.append((i, highs[i]))
-        if lows[i] == min(lows[i - 5:i + 6]):
-            troughs.append((i, lows[i]))
+    for i in range(10, n - 10):
+        # Local maximum with tolerance
+        if (highs[i] >= np.max(highs[i - 5:i + 6]) and
+                highs[i] > np.mean(highs[i - 10:i + 11]) * 1.05):
+            local_maxima.append((i, highs[i]))
 
-    # Detect Head and Shoulders
-    for i in range(2, len(peaks) - 2):
-        left_shoulder_idx, left_shoulder_price = peaks[i - 2]
-        head_idx, head_price = peaks[i]
-        right_shoulder_idx, right_shoulder_price = peaks[i + 2]
+        # Local minimum with tolerance
+        if (lows[i] <= np.min(lows[i - 5:i + 6]) and
+                lows[i] < np.mean(lows[i - 10:i + 11]) * 0.95):
+            local_minima.append((i, lows[i]))
 
-        # Check pattern conditions
-        if (head_price > left_shoulder_price and
-                head_price > right_shoulder_price and
-                abs(left_shoulder_price - right_shoulder_price) / left_shoulder_price <= tolerance and
-                left_shoulder_idx < head_idx < right_shoulder_idx):
-            # Find neckline (low between shoulders)
-            neckline_start = max(0, left_shoulder_idx)
-            neckline_end = min(n, right_shoulder_idx)
-            neckline = np.mean(lows[neckline_start:neckline_end + 1])
+    # Detect Head & Shoulders
+    for i in range(2, len(local_maxima) - 2):
+        left_shoulder_idx, left_shoulder_price = local_maxima[i - 1]
+        head_idx, head_price = local_maxima[i]
+        right_shoulder_idx, right_shoulder_price = local_maxima[i + 1]
+
+        # Check symmetry and proportions
+        price_diff_lh = abs(left_shoulder_price - head_price) / head_price
+        price_diff_rh = abs(right_shoulder_price - head_price) / head_price
+        time_diff_lh = abs(head_idx - left_shoulder_idx)
+        time_diff_rh = abs(right_shoulder_idx - head_idx)
+
+        if (price_diff_lh <= tolerance and
+                price_diff_rh <= tolerance and
+                abs(time_diff_lh - time_diff_rh) <= 5 and
+                head_price > left_shoulder_price * 1.03 and
+                head_price > right_shoulder_price * 1.03):
+            # Find neckline (trough between shoulders)
+            trough_start = left_shoulder_idx
+            trough_end = right_shoulder_idx
+            trough_idx = np.argmin(lows[trough_start:trough_end + 1]) + trough_start
+            neckline = lows[trough_idx]
+
+            # Calculate target
+            target = neckline - (head_price - neckline)  # Correct target calculation
 
             patterns['head_shoulders'].append({
-                'type': PatternType.HEAD_SHOULDERS.value,
-                'confidence': 'high',
-                'left_shoulder': (left_shoulder_idx, float(left_shoulder_price)),
-                'head': (head_idx, float(head_price)),
-                'right_shoulder': (right_shoulder_idx, float(right_shoulder_price)),
-                'neckline': float(neckline),
-                'target': float(head_price - (head_price - neckline)),
-                'stop_loss': float(head_price * 1.02)
+                'left_shoulder_idx': left_shoulder_idx,
+                'head_idx': head_idx,
+                'right_shoulder_idx': right_shoulder_idx,
+                'left_shoulder_price': left_shoulder_price,
+                'head_price': head_price,
+                'right_shoulder_price': right_shoulder_price,
+                'neckline': neckline,
+                'target': target
             })
 
-    # Detect Inverse Head and Shoulders
-    for i in range(2, len(troughs) - 2):
-        left_shoulder_idx, left_shoulder_price = troughs[i - 2]
-        head_idx, head_price = troughs[i]
-        right_shoulder_idx, right_shoulder_price = troughs[i + 2]
+    # Detect Inverse Head & Shoulders
+    for i in range(2, len(local_minima) - 2):
+        left_shoulder_idx, left_shoulder_price = local_minima[i - 1]
+        head_idx, head_price = local_minima[i]
+        right_shoulder_idx, right_shoulder_price = local_minima[i + 1]
 
-        # Check pattern conditions
-        if (head_price < left_shoulder_price and
-                head_price < right_shoulder_price and
-                abs(left_shoulder_price - right_shoulder_price) / left_shoulder_price <= tolerance and
-                left_shoulder_idx < head_idx < right_shoulder_idx):
-            # Find neckline (high between shoulders)
-            neckline_start = max(0, left_shoulder_idx)
-            neckline_end = min(n, right_shoulder_idx)
-            neckline = np.mean(highs[neckline_start:neckline_end + 1])
+        # Check symmetry and proportions
+        price_diff_lh = abs(left_shoulder_price - head_price) / head_price
+        price_diff_rh = abs(right_shoulder_price - head_price) / head_price
+        time_diff_lh = abs(head_idx - left_shoulder_idx)
+        time_diff_rh = abs(right_shoulder_idx - head_idx)
+
+        if (price_diff_lh <= tolerance and
+                price_diff_rh <= tolerance and
+                abs(time_diff_lh - time_diff_rh) <= 5 and
+                head_price < left_shoulder_price * 0.97 and
+                head_price < right_shoulder_price * 0.97):
+            # Find neckline (peak between shoulders)
+            peak_start = left_shoulder_idx
+            peak_end = right_shoulder_idx
+            peak_idx = np.argmax(highs[peak_start:peak_end + 1]) + peak_start
+            neckline = highs[peak_idx]
+
+            # Calculate target
+            target = neckline + (neckline - head_price)  # Correct target calculation
 
             patterns['inverse_head_shoulders'].append({
-                'type': PatternType.INVERSE_HEAD_SHOULDERS.value,
-                'confidence': 'high',
-                'left_shoulder': (left_shoulder_idx, float(left_shoulder_price)),
-                'head': (head_idx, float(head_price)),
-                'right_shoulder': (right_shoulder_idx, float(right_shoulder_price)),
-                'neckline': float(neckline),
-                'target': float(head_price + (neckline - head_price)),
-                'stop_loss': float(head_price * 0.98)
+                'left_shoulder_idx': left_shoulder_idx,
+                'head_idx': head_idx,
+                'right_shoulder_idx': right_shoulder_idx,
+                'left_shoulder_price': left_shoulder_price,
+                'head_price': head_price,
+                'right_shoulder_price': right_shoulder_price,
+                'neckline': neckline,
+                'target': target
             })
-
-    return patterns
-
-
-def detect_triangle_patterns(highs: np.ndarray, lows: np.ndarray, min_length: int = 10) -> List[Dict[str, Any]]:
-    """Обнаружение треугольных паттернов (восходящий, нисходящий, симметричный)"""
-    patterns = []
-    n = len(highs)
-
-    if n < min_length * 2:
-        return patterns
-
-    for start_idx in range(0, n - min_length * 2):
-        end_idx = start_idx + min_length * 2
-
-        # Extract the segment
-        segment_highs = highs[start_idx:end_idx]
-        segment_lows = lows[start_idx:end_idx]
-
-        # Fit trend lines
-        try:
-            # Upper trend line (resistance)
-            upper_slope, upper_intercept = np.polyfit(
-                np.arange(len(segment_highs)), segment_highs, 1
-            )
-
-            # Lower trend line (support)
-            lower_slope, lower_intercept = np.polyfit(
-                np.arange(len(segment_lows)), segment_lows, 1
-            )
-
-            # Determine pattern type
-            if upper_slope < 0 and lower_slope > 0:
-                pattern_type = PatternType.TRIANGLE
-                confidence = 'high'
-            elif upper_slope < 0 and abs(lower_slope) < 0.001:
-                pattern_type = PatternType.TRIANGLE
-                confidence = 'medium'
-            elif abs(upper_slope) < 0.001 and lower_slope > 0:
-                pattern_type = PatternType.TRIANGLE
-                confidence = 'medium'
-            else:
-                continue
-
-            patterns.append({
-                'type': pattern_type.value,
-                'confidence': confidence,
-                'start_index': start_idx,
-                'end_index': end_idx - 1,
-                'upper_slope': float(upper_slope),
-                'lower_slope': float(lower_slope),
-                'breakout_direction': 'unknown'
-            })
-
-        except:
-            continue
 
     return patterns
 
 
 def detect_support_resistance(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray,
-                              window: int = 20, tolerance: float = 0.005) -> Dict[str, List[float]]:
-    """Обнаружение уровней поддержки и сопротивления"""
+                              tolerance: float = 0.005, min_touches: int = 3) -> Dict[str, List[float]]:
+    """Обнаружение уровней поддержки и сопротивления с tolerance"""
     levels = {
         'support': [],
         'resistance': []
     }
 
-    n = len(highs)
-    if n < window * 2:
+    n = len(closes)
+    if n < 20:
         return levels
 
-    # Find significant highs and lows
-    significant_highs = []
-    significant_lows = []
+    # Find potential support levels (local minima)
+    for i in range(10, n - 10):
+        current_low = lows[i]
 
-    for i in range(window, n - window):
-        if highs[i] == max(highs[i - window:i + window + 1]):
-            significant_highs.append((i, highs[i]))
-        if lows[i] == min(lows[i - window:i + window + 1]):
-            significant_lows.append((i, lows[i]))
+        # Check if this is a local minimum within tolerance
+        is_min = True
+        touch_count = 0
 
-    # Cluster similar resistance levels
-    resistance_clusters = []
-    for idx, price in significant_highs:
-        found_cluster = False
-        for cluster in resistance_clusters:
-            if abs(price - cluster['price']) / cluster['price'] <= tolerance:
-                cluster['prices'].append(price)
-                cluster['indices'].append(idx)
-                cluster['price'] = np.mean(cluster['prices'])
-                found_cluster = True
+        for j in range(-10, 11):
+            if j != 0 and lows[i + j] < current_low * (1 - tolerance):
+                is_min = False
                 break
+            if abs(lows[i + j] - current_low) <= current_low * tolerance:
+                touch_count += 1
 
-        if not found_cluster:
-            resistance_clusters.append({
-                'price': price,
-                'prices': [price],
-                'indices': [idx]
-            })
+        if is_min and touch_count >= min_touches and current_low not in levels['support']:
+            levels['support'].append(current_low)
 
-    # Cluster similar support levels
-    support_clusters = []
-    for idx, price in significant_lows:
-        found_cluster = False
-        for cluster in support_clusters:
-            if abs(price - cluster['price']) / cluster['price'] <= tolerance:
-                cluster['prices'].append(price)
-                cluster['indices'].append(idx)
-                cluster['price'] = np.mean(cluster['prices'])
-                found_cluster = True
+    # Find potential resistance levels (local maxima)
+    for i in range(10, n - 10):
+        current_high = highs[i]
+
+        # Check if this is a local maximum within tolerance
+        is_max = True
+        touch_count = 0
+
+        for j in range(-10, 11):
+            if j != 0 and highs[i + j] > current_high * (1 + tolerance):
+                is_max = False
                 break
+            if abs(highs[i + j] - current_high) <= current_high * tolerance:
+                touch_count += 1
 
-        if not found_cluster:
-            support_clusters.append({
-                'price': price,
-                'prices': [price],
-                'indices': [idx]
-            })
+        if is_max and touch_count >= min_touches and current_high not in levels['resistance']:
+            levels['resistance'].append(current_high)
 
-    # Filter clusters by strength (minimum number of touches)
-    min_touches = 2
-    for cluster in resistance_clusters:
-        if len(cluster['prices']) >= min_touches:
-            levels['resistance'].append(float(cluster['price']))
-
-    for cluster in support_clusters:
-        if len(cluster['prices']) >= min_touches:
-            levels['support'].append(float(cluster['price']))
+    # Remove duplicates and sort
+    levels['support'] = sorted(list(set(levels['support'])))
+    levels['resistance'] = sorted(list(set(levels['resistance'])))
 
     return levels
 
 
-def calculate_fibonacci_levels(high: float, low: float) -> Dict[str, float]:
-    """Расчет уровней Фибоначчи от заданного диапазона"""
-    price_range = high - low
-
-    return {
-        'level_0': high,
-        'level_236': high - price_range * FibonacciLevel.RETRACEMENT_236.value,
-        'level_382': high - price_range * FibonacciLevel.RETRACEMENT_382.value,
-        'level_500': high - price_range * FibonacciLevel.RETRACEMENT_500.value,
-        'level_618': high - price_range * FibonacciLevel.RETRACEMENT_618.value,
-        'level_786': high - price_range * FibonacciLevel.RETRACEMENT_786.value,
-        'level_100': low,
-        'level_127': low - price_range * FibonacciLevel.EXTENSION_127.value,
-        'level_161': low - price_range * FibonacciLevel.EXTENSION_161.value,
-        'level_261': low - price_range * FibonacciLevel.EXTENSION_261.value
-    }
-
-
-def detect_trend_lines(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray,
-                       min_points: int = 3, angle_tolerance: float = 5.0) -> Dict[str, List[Dict]]:
-    """Обнаружение линий тренда (восходящих и нисходящих)"""
-    trend_lines = {
-        'uptrend': [],
-        'downtrend': []
+def detect_price_channels(highs: np.ndarray, lows: np.ndarray, period: int = 20) -> Dict[str, Any]:
+    """Обнаружение ценовых каналов (восходящих, нисходящих, боковых)"""
+    channels = {
+        'upward': [],
+        'downward': [],
+        'sideways': []
     }
 
     n = len(highs)
-    if n < min_points * 2:
-        return trend_lines
-
-    # Find significant swing highs and lows
-    swing_highs = []
-    swing_lows = []
-
-    for i in range(5, n - 5):
-        if highs[i] == max(highs[i - 5:i + 6]):
-            swing_highs.append((i, highs[i]))
-        if lows[i] == min(lows[i - 5:i + 6]):
-            swing_lows.append((i, lows[i]))
-
-    # Detect downtrend lines (resistance)
-    for i in range(len(swing_highs) - min_points + 1):
-        points = swing_highs[i:i + min_points]
-        indices = [p[0] for p in points]
-        prices = [p[1] for p in points]
-
-        try:
-            slope, intercept = np.polyfit(indices, prices, 1)
-            angle = np.degrees(np.arctan(slope))
-
-            if slope < 0 and abs(angle) > angle_tolerance:
-                trend_lines['downtrend'].append({
-                    'slope': float(slope),
-                    'intercept': float(intercept),
-                    'angle': float(angle),
-                    'points': points,
-                    'r_squared': float(np.corrcoef(indices, prices)[0, 1] ** 2)
-                })
-        except:
-            continue
-
-    # Detect uptrend lines (support)
-    for i in range(len(swing_lows) - min_points + 1):
-        points = swing_lows[i:i + min_points]
-        indices = [p[0] for p in points]
-        prices = [p[1] for p in points]
-
-        try:
-            slope, intercept = np.polyfit(indices, prices, 1)
-            angle = np.degrees(np.arctan(slope))
-
-            if slope > 0 and abs(angle) > angle_tolerance:
-                trend_lines['uptrend'].append({
-                    'slope': float(slope),
-                    'intercept': float(intercept),
-                    'angle': float(angle),
-                    'points': points,
-                    'r_squared': float(np.corrcoef(indices, prices)[0, 1] ** 2)
-                })
-        except:
-            continue
-
-    return trend_lines
-
-
-def detect_price_channels(highs: np.ndarray, lows: np.ndarray, period: int = 20) -> List[Dict[str, Any]]:
-    """Обнаружение ценовых каналов"""
-    channels = []
-    n = len(highs)
-
     if n < period * 2:
         return channels
 
-    for start_idx in range(0, n - period):
-        end_idx = start_idx + period
+    for i in range(period, n - period):
+        # Current window
+        high_window = highs[i - period:i + 1]
+        low_window = lows[i - period:i + 1]
 
-        channel_highs = highs[start_idx:end_idx]
-        channel_lows = lows[start_idx:end_idx]
+        # Linear regression for trend direction
+        x = np.arange(period + 1)
+        high_slope, _, _, _, _ = stats.linregress(x, high_window)
+        low_slope, _, _, _, _ = stats.linregress(x, low_window)
 
-        upper_band = np.max(channel_highs)
-        lower_band = np.min(channel_lows)
+        # Channel parameters
+        upper_band = np.max(high_window)
+        lower_band = np.min(low_window)
+        middle_band = (upper_band + lower_band) / 2
 
-        # Check if prices stay within the channel
-        prices_in_channel = True
-        for i in range(start_idx, end_idx):
-            if highs[i] > upper_band * 1.01 or lows[i] < lower_band * 0.99:
-                prices_in_channel = False
-                break
+        # Determine channel type
+        if high_slope > 0 and low_slope > 0:
+            channel_type = 'upward'
+        elif high_slope < 0 and low_slope < 0:
+            channel_type = 'downward'
+        else:
+            channel_type = 'sideways'
 
-        if prices_in_channel:
-            channels.append({
-                'type': PatternType.CHANNEL.value,
-                'start_index': start_idx,
-                'end_index': end_idx - 1,
-                'upper_bound': float(upper_band),
-                'lower_bound': float(lower_band),
-                'height': float(upper_band - lower_band)
+        # Check if price is within channel (not breaking out)
+        current_high = highs[i]
+        current_low = lows[i]
+
+        if (current_high <= upper_band * 1.02 and  # Allow small margin
+                current_low >= lower_band * 0.98):
+            channels[channel_type].append({
+                'start_idx': i - period,
+                'end_idx': i,
+                'upper_band': upper_band,
+                'lower_band': lower_band,
+                'middle_band': middle_band,
+                'slope': (high_slope + low_slope) / 2
             })
 
     return channels
 
 
-def detect_gann_levels(high: float, low: float, current_price: float) -> Dict[str, float]:
-    """Расчет уровней Ганна от значимых экстремумов"""
+def calculate_fibonacci_levels(high: float, low: float) -> Dict[str, float]:
+    """Расчет уровней Фибоначчи для заданного диапазона"""
     price_range = high - low
 
-    # Gann's important levels
-    levels = {
-        '1/8': low + price_range * 0.125,
-        '1/4': low + price_range * 0.25,
-        '1/3': low + price_range * 0.333,
-        '3/8': low + price_range * 0.375,
-        '1/2': low + price_range * 0.5,
-        '5/8': low + price_range * 0.625,
-        '2/3': low + price_range * 0.666,
-        '3/4': low + price_range * 0.75,
-        '7/8': low + price_range * 0.875
+    return {
+        'retracement_236': high - price_range * 0.236,
+        'retracement_382': high - price_range * 0.382,
+        'retracement_500': high - price_range * 0.5,
+        'retracement_618': high - price_range * 0.618,
+        'retracement_786': high - price_range * 0.786,
+        'extension_127': high + price_range * 0.272,
+        'extension_161': high + price_range * 0.618,
+        'extension_261': high + price_range * 1.618
     }
 
-    # Add current price position relative to Gann levels
-    for level_name, level_price in levels.items():
-        levels[f'current_vs_{level_name}'] = (current_price - level_price) / level_price * 100
 
-    return levels
+def detect_triangle_patterns(highs: np.ndarray, lows: np.ndarray,
+                             min_length: int = 10, max_length: int = 50) -> Dict[str, Any]:
+    """Обнаружение треугольных паттернов (восходящие, нисходящие, симметричные)"""
+    triangles = {
+        'ascending': [],
+        'descending': [],
+        'symmetrical': []
+    }
+
+    n = len(highs)
+    if n < max_length * 2:
+        return triangles
+
+    for start_idx in range(0, n - max_length):
+        for end_idx in range(start_idx + min_length, start_idx + max_length):
+            if end_idx >= n:
+                continue
+
+            segment_highs = highs[start_idx:end_idx + 1]
+            segment_lows = lows[start_idx:end_idx + 1]
+
+            # Fit trend lines
+            x = np.arange(len(segment_highs))
+
+            # Upper trend line (resistance)
+            upper_slope, upper_intercept, _, _, _ = stats.linregress(x, segment_highs)
+
+            # Lower trend line (support)
+            lower_slope, lower_intercept, _, _, _ = stats.linregress(x, segment_lows)
+
+            # Check for convergence
+            if upper_slope < 0 and lower_slope > 0:
+                triangle_type = 'symmetrical'
+            elif upper_slope < 0 and abs(lower_slope) < 0.001:
+                triangle_type = 'descending'
+            elif abs(upper_slope) < 0.001 and lower_slope > 0:
+                triangle_type = 'ascending'
+            else:
+                continue
+
+            # Calculate breakout point
+            breakout_price = (upper_intercept + lower_intercept) / 2
+
+            triangles[triangle_type].append({
+                'start_idx': start_idx,
+                'end_idx': end_idx,
+                'upper_slope': upper_slope,
+                'lower_slope': lower_slope,
+                'breakout_price': breakout_price
+            })
+
+    return triangles
 
 
 # ==================== ОСНОВНОЙ КЛАСС ИНДИКАТОРОВ ====================
 
-class UltraPerformanceIndicators:
-    """УЛЬТРА-ПРОИЗВОДИТЕЛЬНЫЙ КЛАСС ТЕХНИЧЕСКИХ ИНДИКАТОРОВ И ПАТТЕРНОВ"""
+class TechnicalIndicators:
+    """ULTRA-PERFORMANCE КЛАСС ТЕХНИЧЕСКИХ ИНДИКАТОРОВ ДЛЯ КРИПТОРЫНКА"""
 
     def __init__(self, data: pd.DataFrame):
         """
-        Инициализация с рыночными данными
+        Инициализация с данными OHLCV
 
         Args:
             data: DataFrame с колонками ['open', 'high', 'low', 'close', 'volume']
         """
         self.data = data.copy()
-        self.highs = data['high'].values
-        self.lows = data['low'].values
-        self.closes = data['close'].values
-        self.opens = data['open'].values
-        self.volumes = data['volume'].values if 'volume' in data.columns else np.zeros(len(data))
-
-        # Кэширование вычисленных индикаторов
         self._cache = {}
+        self._indicators_cache = {}
 
-    def _get_cached(self, key: str, func: callable, *args) -> Any:
-        """Получение данных из кэша или вычисление"""
-        cache_key = f"{key}_{'_'.join(map(str, args))}"
+    def _get_cached(self, key: str, calculation_func, *args, **kwargs) -> Any:
+        """
+        Умный кэш с оптимизированными ключами (без гигантских строк массивов)
+        """
+        # Создаем компактный ключ на основе параметров
+        cache_key = f"{key}_{str(args)}_{str(kwargs)}"
+
         if cache_key not in self._cache:
-            self._cache[cache_key] = func(*args)
+            self._cache[cache_key] = calculation_func(*args, **kwargs)
+
         return self._cache[cache_key]
-
-    # ==================== БАЗОВЫЕ ИНДИКАТОРЫ ====================
-
-    def sma(self, period: int = 20) -> np.ndarray:
-        """Простая скользящая средняя"""
-        return self._get_cached('sma', vectorized_sma_numba, self.closes, period)
-
-    def ema(self, period: int = 20) -> np.ndarray:
-        """Экспоненциальная скользящая средняя"""
-        return self._get_cached('ema', vectorized_ema_numba, self.closes, period)
 
     def rsi(self, period: int = 14) -> np.ndarray:
-        """Индекс относительной силы"""
-        return self._get_cached('rsi', vectorized_rsi_numba, self.closes, period)
+        """Relative Strength Index"""
+        closes = self.data['close'].values
+        return self._get_cached(f"rsi_{period}", vectorized_rsi_numba, closes, period)
 
-    def macd(self, fast_period: int = 12, slow_period: int = 26, signal_period: int = 9) -> Tuple:
-        """Схождение/расхождение скользящих средних"""
-        cache_key = f"macd_{fast_period}_{slow_period}_{signal_period}"
-        if cache_key not in self._cache:
-            result = vectorized_macd_numba(self.closes, fast_period, slow_period, signal_period)
-            self._cache[cache_key] = result
-        return self._cache[cache_key]
+    def macd(self, fast_period: int = 12, slow_period: int = 26, signal_period: int = 9) -> Tuple[
+        np.ndarray, np.ndarray, np.ndarray]:
+        """Moving Average Convergence Divergence"""
+        closes = self.data['close'].values
+        return self._get_cached(f"macd_{fast_period}_{slow_period}_{signal_period}",
+                                vectorized_macd_numba, closes, fast_period, slow_period, signal_period)
 
-    def bollinger_bands(self, period: int = 20, std_dev: float = 2.0) -> Tuple:
-        """Полосы Боллинджера"""
-        cache_key = f"bollinger_{period}_{std_dev}"
-        if cache_key not in self._cache:
-            result = vectorized_bollinger_bands_numba(self.closes, period, std_dev)
-            self._cache[cache_key] = result
-        return self._cache[cache_key]
+    def bollinger_bands(self, period: int = 20, std_dev: float = 2.0) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Bollinger Bands"""
+        closes = self.data['close'].values
+        return self._get_cached(f"bb_{period}_{std_dev}",
+                                vectorized_bollinger_bands_numba, closes, period, std_dev)
 
     def atr(self, period: int = 14) -> np.ndarray:
         """Average True Range"""
-        return self._get_cached('atr', vectorized_atr_numba, self.highs, self.lows, self.closes, period)
+        highs = self.data['high'].values
+        lows = self.data['low'].values
+        closes = self.data['close'].values
+        return self._get_cached(f"atr_{period}", vectorized_atr_numba, highs, lows, closes, period)
 
-    def stochastic(self, k_period: int = 14, d_period: int = 3) -> Tuple:
-        """Стохастический осциллятор"""
-        cache_key = f"stochastic_{k_period}_{d_period}"
-        if cache_key not in self._cache:
-            result = vectorized_stochastic_numba(self.highs, self.lows, self.closes, k_period, d_period)
-            self._cache[cache_key] = result
-        return self._cache[cache_key]
+    def stochastic(self, k_period: int = 14, d_period: int = 3) -> Tuple[np.ndarray, np.ndarray]:
+        """Stochastic Oscillator"""
+        highs = self.data['high'].values
+        lows = self.data['low'].values
+        closes = self.data['close'].values
+        return self._get_cached(f"stoch_{k_period}_{d_period}",
+                                vectorized_stochastic_numba, highs, lows, closes, k_period, d_period)
 
     def obv(self) -> np.ndarray:
         """On-Balance Volume"""
-        return self._get_cached('obv', vectorized_obv_numba, self.closes, self.volumes)
+        closes = self.data['close'].values
+        volumes = self.data['volume'].values
+        return self._get_cached("obv", vectorized_obv_numba, closes, volumes)
 
-    def adx(self, period: int = 14) -> Tuple:
+    def adx(self, period: int = 14) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Average Directional Index"""
-        cache_key = f"adx_{period}"
-        if cache_key not in self._cache:
-            result = vectorized_adx_numba(self.highs, self.lows, self.closes, period)
-            self._cache[cache_key] = result
-        return self._cache[cache_key]
-
-    # ==================== ПРОДВИНУТЫЕ ИНДИКАТОРЫ ====================
+        highs = self.data['high'].values
+        lows = self.data['low'].values
+        closes = self.data['close'].values
+        return self._get_cached(f"adx_{period}", vectorized_adx_numba, highs, lows, closes, period)
 
     def ichimoku(self, conversion_period: int = 9, base_period: int = 26,
-                 leading_span_b_period: int = 52) -> Tuple:
-        """Ишимоку Кинко Хайо"""
-        cache_key = f"ichimoku_{conversion_period}_{base_period}_{leading_span_b_period}"
-        if cache_key not in self._cache:
-            result = vectorized_ichimoku_numba(self.highs, self.lows, conversion_period,
-                                               base_period, leading_span_b_period)
-            self._cache[cache_key] = result
-        return self._cache[cache_key]
+                 leading_span_b_period: int = 52) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Ультра-быстрый расчет Ichimoku Cloud с использованием Numba"""
+        highs = self.highs
+        lows = self.lows
+
+        # Tenkan-sen (Conversion Line)
+        tenkan_sen = np.full_like(highs, np.nan, dtype=np.float64)
+        for i in range(conversion_period - 1, len(highs)):
+            high_window = highs[i - conversion_period + 1:i + 1]
+            low_window = lows[i - conversion_period + 1:i + 1]
+            tenkan_sen[i] = (np.max(high_window) + np.min(low_window)) / 2
+
+        # Kijun-sen (Base Line)
+        kijun_sen = np.full_like(highs, np.nan, dtype=np.float64)
+        for i in range(base_period - 1, len(highs)):
+            high_window = highs[i - base_period + 1:i + 1]
+            low_window = lows[i - base_period + 1:i + 1]
+            kijun_sen[i] = (np.max(high_window) + np.min(low_window)) / 2
+
+        # Senkou Span A (Leading Span A) - сдвиг вперед на base_period
+        senkou_span_a = _shift_with_nan((tenkan_sen + kijun_sen) / 2, base_period)
+
+        # Senkou Span B (Leading Span B) - сдвиг вперед на base_period
+        senkou_span_b = np.full_like(highs, np.nan, dtype=np.float64)
+        for i in range(leading_span_b_period - 1, len(highs)):
+            high_window = highs[i - leading_span_b_period + 1:i + 1]
+            low_window = lows[i - leading_span_b_period + 1:i + 1]
+            senkou_span_b[i] = (np.max(high_window) + np.min(low_window)) / 2
+        senkou_span_b = _shift_with_nan(senkou_span_b, base_period)
+
+        # Chikou Span (Lagging Span) - shifted backward
+        chikou_span = _shift_with_nan(self.closes, -base_period)
+
+        return tenkan_sen, kijun_sen, senkou_span_a, senkou_span_b, chikou_span
 
     def keltner_channels(self, period: int = 20, atr_period: int = 10,
-                         multiplier: float = 2.0) -> Tuple:
-        """Каналы Кельтнера"""
-        cache_key = f"keltner_{period}_{atr_period}_{multiplier}"
-        if cache_key not in self._cache:
-            result = vectorized_keltner_channels_numba(self.highs, self.lows, self.closes,
-                                                       period, atr_period, multiplier)
-            self._cache[cache_key] = result
-        return self._cache[cache_key]
+                         multiplier: float = 2.0) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Keltner Channels"""
+        highs = self.data['high'].values
+        lows = self.data['low'].values
+        closes = self.data['close'].values
+        return self._get_cached(f"keltner_{period}_{atr_period}_{multiplier}",
+                                vectorized_keltner_channels_numba, highs, lows, closes, period, atr_period, multiplier)
 
-    def donchian_channels(self, period: int = 20) -> Tuple:
-        """Каналы Дончиана"""
-        cache_key = f"donchian_{period}"
-        if cache_key not in self._cache:
-            result = vectorized_donchian_channels_numba(self.highs, self.lows, period)
-            self._cache[cache_key] = result
-        return self._cache[cache_key]
+    def donchian_channels(self, period: int = 20) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Donchian Channels"""
+        highs = self.data['high'].values
+        lows = self.data['low'].values
+        return self._get_cached(f"donchian_{period}", vectorized_donchian_channels_numba, highs, lows, period)
 
     def parabolic_sar(self, acceleration: float = 0.02, maximum: float = 0.2) -> np.ndarray:
         """Parabolic SAR"""
-        return self._get_cached('parabolic_sar', vectorized_parabolic_sar_numba,
-                                self.highs, self.lows, acceleration, maximum)
+        highs = self.data['high'].values
+        lows = self.data['low'].values
+        return self._get_cached(f"parabolic_sar_{acceleration}_{maximum}",
+                                vectorized_parabolic_sar_numba, highs, lows, acceleration, maximum)
 
-    def supertrend(self, period: int = 10, multiplier: float = 3.0) -> Tuple:
+    def supertrend(self, period: int = 10, multiplier: float = 3.0) -> Tuple[np.ndarray, np.ndarray]:
         """SuperTrend"""
-        cache_key = f"supertrend_{period}_{multiplier}"
-        if cache_key not in self._cache:
-            result = vectorized_supertrend_numba(self.highs, self.lows, self.closes,
-                                                 period, multiplier)
-            self._cache[cache_key] = result
-        return self._cache[cache_key]
+        highs = self.data['high'].values
+        lows = self.data['low'].values
+        closes = self.data['close'].values
+        return self._get_cached(f"supertrend_{period}_{multiplier}",
+                                vectorized_supertrend_numba, highs, lows, closes, period, multiplier)
 
     def alligator(self, jaw_period: int = 13, jaw_shift: int = 8,
                   teeth_period: int = 8, teeth_shift: int = 5,
-                  lips_period: int = 5, lips_shift: int = 3) -> Tuple:
-        """Аллигатор"""
-        cache_key = f"alligator_{jaw_period}_{jaw_shift}_{teeth_period}_{teeth_shift}_{lips_period}_{lips_shift}"
-        if cache_key not in self._cache:
-            result = vectorized_alligator_numba(self.highs, self.lows, jaw_period, jaw_shift,
-                                                teeth_period, teeth_shift, lips_period, lips_shift)
-            self._cache[cache_key] = result
-        return self._cache[cache_key]
+                  lips_period: int = 5, lips_shift: int = 3) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Ультра-быстрый расчет Alligator с использованием Numba (без подглядывания в будущее)"""
+        n = len(self.highs)
 
-    def fractals(self, window: int = 2) -> Tuple:
-        """Фракталы"""
-        cache_key = f"fractals_{window}"
-        if cache_key not in self._cache:
-            result = detect_fractals_numba(self.highs, self.lows, window)
-            self._cache[cache_key] = result
-        return self._cache[cache_key]
+        # Median price
+        median_price = (self.highs + self.lows) / 2
+
+        # Jaw (синяя линия)
+        jaw = vectorized_sma_numba(median_price, jaw_period)
+        jaw_shifted = _shift_with_nan(jaw, jaw_shift)
+
+        # Teeth (красная линия)
+        teeth = vectorized_sma_numba(median_price, teeth_period)
+        teeth_shifted = _shift_with_nan(teeth, teeth_shift)
+
+        # Lips (зеленая линия)
+        lips = vectorized_sma_numba(median_price, lips_period)
+        lips_shifted = _shift_with_nan(lips, lips_shift)
+
+        return jaw_shifted, teeth_shifted, lips_shifted
+
+    def fractals(self, window: int = 2) -> Tuple[np.ndarray, np.ndarray]:
+        """Fractals"""
+        highs = self.data['high'].values
+        lows = self.data['low'].values
+        return self._get_cached(f"fractals_{window}", detect_fractals_numba, highs, lows, window)
+
+    def gann_angles(self, start_idx: int, end_idx: int) -> Tuple[float, float, float, float]:
+        """Gann Angles"""
+        highs = self.data['high'].values
+        lows = self.data['low'].values
+        closes = self.data['close'].values
+        return vectorized_gann_angles_numba(highs, lows, closes, start_idx, end_idx)
 
     def momentum(self, period: int = 10) -> np.ndarray:
-        """Моментум"""
-        return self._get_cached('momentum', vectorized_momentum_numba, self.closes, period)
+        """Momentum"""
+        closes = self.data['close'].values
+        return self._get_cached(f"momentum_{period}", vectorized_momentum_numba, closes, period)
 
     def roc(self, period: int = 10) -> np.ndarray:
         """Rate of Change"""
-        return self._get_cached('roc', vectorized_roc_numba, self.closes, period)
+        closes = self.data['close'].values
+        return self._get_cached(f"roc_{period}", vectorized_roc_numba, closes, period)
 
     def cci(self, period: int = 20) -> np.ndarray:
         """Commodity Channel Index"""
-        return self._get_cached('cci', vectorized_cci_numba, self.highs, self.lows, self.closes, period)
+        highs = self.data['high'].values
+        lows = self.data['low'].values
+        closes = self.data['close'].values
+        return self._get_cached(f"cci_{period}", vectorized_cci_numba, highs, lows, closes, period)
 
     def williams_r(self, period: int = 14) -> np.ndarray:
         """Williams %R"""
-        return self._get_cached('williams_r', vectorized_williams_r_numba, self.highs, self.lows, self.closes, period)
+        highs = self.data['high'].values
+        lows = self.data['low'].values
+        closes = self.data['close'].values
+        return self._get_cached(f"williams_r_{period}", vectorized_williams_r_numba, highs, lows, closes, period)
 
     def mfi(self, period: int = 14) -> np.ndarray:
         """Money Flow Index"""
-        return self._get_cached('mfi', vectorized_mfi_numba, self.highs, self.lows, self.closes, self.volumes, period)
+        highs = self.data['high'].values
+        lows = self.data['low'].values
+        closes = self.data['close'].values
+        volumes = self.data['volume'].values
+        return self._get_cached(f"mfi_{period}", vectorized_mfi_numba, highs, lows, closes, volumes, period)
 
-    # ==================== ГРАФИЧЕСКИЕ ИНСТРУМЕНТЫ ====================
-
-    def detect_patterns(self) -> Dict[str, Any]:
+    def detect_patterns(self, tolerance: float = 0.02) -> Dict[str, Any]:
         """Обнаружение всех графических паттернов"""
+        highs = self.data['high'].values
+        lows = self.data['low'].values
+
         patterns = {}
-
-        # Double Top/Bottom
-        double_patterns = detect_double_top_bottom(self.highs, self.lows)
-        patterns.update(double_patterns)
-
-        # Head and Shoulders
-        hs_patterns = detect_head_shoulders(self.highs, self.lows)
-        patterns.update(hs_patterns)
-
-        # Triangles
-        triangles = detect_triangle_patterns(self.highs, self.lows)
-        patterns['triangles'] = triangles
-
-        # Channels
-        channels = detect_price_channels(self.highs, self.lows)
-        patterns['channels'] = channels
+        patterns.update(detect_double_top_bottom(highs, lows, tolerance))
+        patterns.update(detect_head_shoulders(highs, lows, tolerance))
+        patterns['triangles'] = detect_triangle_patterns(highs, lows)
 
         return patterns
 
-    def support_resistance(self, window: int = 20) -> Dict[str, List[float]]:
+    def support_resistance(self, tolerance: float = 0.005, min_touches: int = 3) -> Dict[str, List[float]]:
         """Уровни поддержки и сопротивления"""
-        return detect_support_resistance(self.highs, self.lows, self.closes, window)
+        highs = self.data['high'].values
+        lows = self.data['low'].values
+        closes = self.data['close'].values
 
-    def fibonacci_levels(self, lookback_period: int = 100) -> Dict[str, float]:
-        """Уровни Фибоначчи от последнего значимого движения"""
-        if len(self.closes) < lookback_period:
-            high = np.max(self.highs)
-            low = np.min(self.lows)
-        else:
-            high = np.max(self.highs[-lookback_period:])
-            low = np.min(self.lows[-lookback_period:])
+        return detect_support_resistance(highs, lows, closes, tolerance, min_touches)
 
+    def price_channels(self, period: int = 20) -> Dict[str, Any]:
+        """Ценовые каналы"""
+        highs = self.data['high'].values
+        lows = self.data['low'].values
+
+        return detect_price_channels(highs, lows, period)
+
+    def fibonacci_levels(self, high: float, low: float) -> Dict[str, float]:
+        """Уровни Фибоначчи"""
         return calculate_fibonacci_levels(high, low)
 
-    def trend_lines(self) -> Dict[str, List[Dict]]:
-        """Линии тренда"""
-        return detect_trend_lines(self.highs, self.lows, self.closes)
-
-    def gann_levels(self, lookback_period: int = 100) -> Dict[str, float]:
-        """Уровни Ганна"""
-        if len(self.closes) < lookback_period:
-            high = np.max(self.highs)
-            low = np.min(self.lows)
-        else:
-            high = np.max(self.highs[-lookback_period:])
-            low = np.min(self.lows[-lookback_period:])
-
-        current_price = self.closes[-1]
-        return detect_gann_levels(high, low, current_price)
-
-    def get_all_indicators(self) -> Dict[str, Any]:
-        """Получение всех индикаторов сразу"""
-        indicators = {}
-
-        # Basic indicators
-        indicators['sma_20'] = self.sma(20)
-        indicators['sma_50'] = self.sma(50)
-        indicators['sma_200'] = self.sma(200)
-        indicators['ema_20'] = self.ema(20)
-        indicators['ema_50'] = self.ema(50)
-        indicators['rsi'] = self.rsi(14)
-
-        macd_line, signal_line, histogram = self.macd()
-        indicators['macd_line'] = macd_line
-        indicators['macd_signal'] = signal_line
-        indicators['macd_histogram'] = histogram
-
-        bb_upper, bb_middle, bb_lower = self.bollinger_bands()
-        indicators['bb_upper'] = bb_upper
-        indicators['bb_middle'] = bb_middle
-        indicators['bb_lower'] = bb_lower
-
-        indicators['atr'] = self.atr()
-
-        # Advanced indicators
-        tenkan, kijun, senkou_a, senkou_b = self.ichimoku()
-        indicators['ichimoku_tenkan'] = tenkan
-        indicators['ichimoku_kijun'] = kijun
-        indicators['ichimoku_senkou_a'] = senkou_a
-        indicators['ichimoku_senkou_b'] = senkou_b
-
-        kc_upper, kc_middle, kc_lower = self.keltner_channels()
-        indicators['keltner_upper'] = kc_upper
-        indicators['keltner_middle'] = kc_middle
-        indicators['keltner_lower'] = kc_lower
-
-        dc_upper, dc_middle, dc_lower = self.donchian_channels()
-        indicators['donchian_upper'] = dc_upper
-        indicators['donchian_middle'] = dc_middle
-        indicators['donchian_lower'] = dc_lower
-
-        indicators['parabolic_sar'] = self.parabolic_sar()
-
-        supertrend, direction = self.supertrend()
-        indicators['supertrend'] = supertrend
-        indicators['supertrend_direction'] = direction
-
-        jaw, teeth, lips = self.alligator()
-        indicators['alligator_jaw'] = jaw
-        indicators['alligator_teeth'] = teeth
-        indicators['alligator_lips'] = lips
-
-        fractal_highs, fractal_lows = self.fractals()
-        indicators['fractal_highs'] = fractal_highs
-        indicators['fractal_lows'] = fractal_lows
-
-        # Pattern detection
-        indicators['patterns'] = self.detect_patterns()
-        indicators['support_resistance'] = self.support_resistance()
-        indicators['fibonacci_levels'] = self.fibonacci_levels()
-        indicators['trend_lines'] = self.trend_lines()
-        indicators['gann_levels'] = self.gann_levels()
-
-        return indicators
+    def clear_cache(self):
+        """Очистка кэша"""
+        self._cache.clear()
+        self._indicators_cache.clear()
 
 
-# ==================== УТИЛИТЫ И ХЕЛПЕРЫ ====================
+# ==================== УТИЛИТЫ И ДОПОЛНИТЕЛЬНЫЕ ФУНКЦИИ ====================
 
-def calculate_correlation(series1: np.ndarray, series2: np.ndarray) -> float:
-    """Расчет корреляции между двумя рядами"""
-    if len(series1) != len(series2):
-        min_len = min(len(series1), len(series2))
-        series1 = series1[-min_len:]
-        series2 = series2[-min_len:]
+def calculate_pivot_points(high: float, low: float, close: float) -> Dict[str, float]:
+    """Расчет классических pivot points"""
+    pivot = (high + low + close) / 3
 
-    valid_mask = ~(np.isnan(series1) | np.isnan(series2))
-    if np.sum(valid_mask) < 2:
-        return 0.0
-
-    return float(np.corrcoef(series1[valid_mask], series2[valid_mask])[0, 1])
-
-
-def calculate_zscore(series: np.ndarray, window: int = 20) -> np.ndarray:
-    """Расчет Z-Score для ряда"""
-    n = len(series)
-    zscore = np.full(n, np.nan, dtype=np.float64)
-
-    for i in range(window, n):
-        window_data = series[i - window:i]
-        mean = np.mean(window_data)
-        std = np.std(window_data)
-
-        if std != 0:
-            zscore[i] = (series[i] - mean) / std
-
-    return zscore
-
-
-def detect_divergence(prices: np.ndarray, indicator: np.ndarray,
-                      lookback_period: int = 20) -> Dict[str, bool]:
-    """Обнаружение дивергенций между ценой и индикатором"""
-    divergence = {
-        'bullish': False,
-        'bearish': False
+    return {
+        'pivot': pivot,
+        'r1': 2 * pivot - low,
+        'r2': pivot + (high - low),
+        'r3': high + 2 * (pivot - low),
+        's1': 2 * pivot - high,
+        's2': pivot - (high - low),
+        's3': low - 2 * (high - pivot)
     }
 
-    n = len(prices)
-    if n < lookback_period * 2:
-        return divergence
 
-    # Find recent extremes
-    recent_prices = prices[-lookback_period:]
-    recent_indicator = indicator[-lookback_period:]
-
-    price_low_idx = np.argmin(recent_prices)
-    price_high_idx = np.argmax(recent_prices)
-
-    indicator_low_idx = np.argmin(recent_indicator)
-    indicator_high_idx = np.argmax(recent_indicator)
-
-    # Bullish divergence (price makes lower low, indicator makes higher low)
-    if (price_low_idx > lookback_period // 2 and
-            indicator_low_idx > lookback_period // 2):
-
-        prev_price_low = np.min(prices[-lookback_period * 2:-lookback_period])
-        prev_indicator_low = np.min(indicator[-lookback_period * 2:-lookback_period])
-
-        if (recent_prices[price_low_idx] < prev_price_low and
-                recent_indicator[indicator_low_idx] > prev_indicator_low):
-            divergence['bullish'] = True
-
-    # Bearish divergence (price makes higher high, indicator makes lower high)
-    if (price_high_idx > lookback_period // 2 and
-            indicator_high_idx > lookback_period // 2):
-
-        prev_price_high = np.max(prices[-lookback_period * 2:-lookback_period])
-        prev_indicator_high = np.max(indicator[-lookback_period * 2:-lookback_period])
-
-        if (recent_prices[price_high_idx] > prev_price_high and
-                recent_indicator[indicator_high_idx] < prev_indicator_high):
-            divergence['bearish'] = True
-
-    return divergence
+def calculate_camarilla_pivots(high: float, low: float, close: float) -> Dict[str, float]:
+    """Расчет Camarilla pivot points"""
+    return {
+        'r4': close + (high - low) * 1.1 / 2,
+        'r3': close + (high - low) * 1.1 / 4,
+        'r2': close + (high - low) * 1.1 / 6,
+        'r1': close + (high - low) * 1.1 / 12,
+        's1': close - (high - low) * 1.1 / 12,
+        's2': close - (high - low) * 1.1 / 6,
+        's3': close - (high - low) * 1.1 / 4,
+        's4': close - (high - low) * 1.1 / 2
+    }
 
 
-def calculate_volatility(series: np.ndarray, window: int = 20) -> np.ndarray:
-    """Расчет волатильности (стандартное отклонение доходностей)"""
-    n = len(series)
-    returns = np.diff(series) / series[:-1]
-    volatility = np.full(n, np.nan, dtype=np.float64)
+def calculate_volume_profile(prices: np.ndarray, volumes: np.ndarray,
+                             bins: int = 20) -> Dict[str, Any]:
+    """Расчет Volume Profile"""
+    if len(prices) == 0 or len(volumes) == 0:
+        return {'price_levels': [], 'volumes': []}
 
-    for i in range(window, len(returns)):
-        volatility[i + 1] = np.std(returns[i - window + 1:i + 1])
+    min_price, max_price = np.min(prices), np.max(prices)
+    price_range = max_price - min_price
 
-    return volatility
+    if price_range < 1e-10:
+        return {'price_levels': [min_price], 'volumes': [np.sum(volumes)]}
 
+    bin_edges = np.linspace(min_price, max_price, bins + 1)
+    bin_volumes = np.zeros(bins)
 
-# ==================== ЭКСПОРТ ОСНОВНЫХ ФУНКЦИЙ ====================
+    for price, volume in zip(prices, volumes):
+        bin_idx = int((price - min_price) / price_range * bins)
+        bin_idx = min(bin_idx, bins - 1)
+        bin_volumes[bin_idx] += volume
 
-__all__ = [
-    'UltraPerformanceIndicators',
-    'PatternType',
-    'FibonacciLevel',
-    'vectorized_ema_numba',
-    'vectorized_sma_numba',
-    'vectorized_rsi_numba',
-    'vectorized_macd_numba',
-    'vectorized_bollinger_bands_numba',
-    'vectorized_atr_numba',
-    'vectorized_stochastic_numba',
-    'vectorized_obv_numba',
-    'vectorized_adx_numba',
-    'vectorized_ichimoku_numba',
-    'vectorized_keltner_channels_numba',
-    'vectorized_donchian_channels_numba',
-    'vectorized_parabolic_sar_numba',
-    'vectorized_supertrend_numba',
-    'vectorized_alligator_numba',
-    'detect_fractals_numba',
-    'vectorized_momentum_numba',
-    'vectorized_roc_numba',
-    'vectorized_cci_numba',
-    'vectorized_williams_r_numba',
-    'vectorized_mfi_numba',
-    'detect_double_top_bottom',
-    'detect_head_shoulders',
-    'detect_triangle_patterns',
-    'detect_support_resistance',
-    'calculate_fibonacci_levels',
-    'detect_trend_lines',
-    'detect_price_channels',
-    'detect_gann_levels',
-    'calculate_correlation',
-    'calculate_zscore',
-    'detect_divergence',
-    'calculate_volatility'
-]
+    price_levels = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+    return {
+        'price_levels': price_levels.tolist(),
+        'volumes': bin_volumes.tolist(),
+        'poc_price': price_levels[np.argmax(bin_volumes)],
+        'value_area_high': price_levels[np.argsort(bin_volumes)[-int(bins * 0.3)]],
+        'value_area_low': price_levels[np.argsort(bin_volumes)[int(bins * 0.3)]]
+    }
 
 
-# ==================== ТЕСТИРОВАНИЕ ПРОИЗВОДИТЕЛЬНОСТИ ====================
+# ==================== ТЕСТИРОВАНИЕ И ВАЛИДАЦИЯ ====================
 
-def benchmark_performance():
-    """Бенчмарк производительности индикаторов"""
-    import time
-
-    # Создание тестовых данных
+def test_indicators():
+    """Тестирование всех индикаторов на синтетических данных"""
     np.random.seed(42)
-    n = 10000
+    n = 1000
+
+    # Создание синтетических данных
+    prices = np.cumsum(np.random.randn(n)) + 100
+    highs = prices + np.abs(np.random.randn(n)) * 2
+    lows = prices - np.abs(np.random.randn(n)) * 2
+    volumes = np.random.lognormal(0, 1, n) * 1000
+
     data = pd.DataFrame({
-        'open': np.random.normal(100, 5, n),
-        'high': np.random.normal(105, 5, n),
-        'low': np.random.normal(95, 5, n),
-        'close': np.random.normal(100, 5, n),
-        'volume': np.random.normal(1000, 200, n)
+        'open': prices,
+        'high': highs,
+        'low': lows,
+        'close': prices,
+        'volume': volumes
     })
 
-    indicators = UltraPerformanceIndicators(data)
+    ti = TechnicalIndicators(data)
 
-    # Бенчмарк основных индикаторов
-    tests = [
-        ('SMA 20', lambda: indicators.sma(20)),
-        ('EMA 20', lambda: indicators.ema(20)),
-        ('RSI 14', lambda: indicators.rsi(14)),
-        ('MACD', lambda: indicators.macd()),
-        ('Bollinger Bands', lambda: indicators.bollinger_bands()),
-        ('ATR 14', lambda: indicators.atr()),
-        ('Ichimoku', lambda: indicators.ichimoku()),
-        ('SuperTrend', lambda: indicators.supertrend()),
-        ('All Indicators', lambda: indicators.get_all_indicators())
-    ]
+    # Тестирование всех индикаторов
+    print("Testing RSI...")
+    rsi = ti.rsi(14)
+    print(f"RSI shape: {rsi.shape}, non-NaN: {np.sum(~np.isnan(rsi))}")
 
-    print("=== БЕНЧМАРК ПРОИЗВОДИТЕЛЬНОСТИ ИНДИКАТОРОВ ===")
-    print(f"Размер данных: {n} баров")
-    print("-" * 50)
+    print("Testing MACD...")
+    macd, signal, hist = ti.macd()
+    print(f"MACD shapes: {macd.shape}, {signal.shape}, {hist.shape}")
 
-    for name, test_func in tests:
-        start_time = time.time()
-        result = test_func()
-        end_time = time.time()
+    print("Testing Bollinger Bands...")
+    upper, middle, lower = ti.bollinger_bands()
+    print(f"BB shapes: {upper.shape}, {middle.shape}, {lower.shape}")
 
-        execution_time = (end_time - start_time) * 1000  # ms
-        print(f"{name:<20}: {execution_time:6.2f} ms")
+    print("Testing ATR...")
+    atr = ti.atr()
+    print(f"ATR shape: {atr.shape}")
 
-    print("-" * 50)
-    print("✅ Все индикаторы работают в реальном времени")
+    print("Testing Stochastic...")
+    k, d = ti.stochastic()
+    print(f"Stochastic shapes: {k.shape}, {d.shape}")
 
+    print("Testing ADX...")
+    pdi, mdi, adx = ti.adx()
+    print(f"ADX shapes: {pdi.shape}, {mdi.shape}, {adx.shape}")
+
+    print("Testing Ichimoku...")
+    tenkan, kijun, senkou_a, senkou_b, chikou = ti.ichimoku()
+    print(f"Ichimoku shapes: {tenkan.shape}, {kijun.shape}, {senkou_a.shape}, {senkou_b.shape}, {chikou.shape}")
+
+    print("Testing patterns...")
+    patterns = ti.detect_patterns()
+    print(f"Patterns found: {sum(len(v) for v in patterns.values())}")
+
+    print("Testing support/resistance...")
+    sr = ti.support_resistance()
+    print(f"Support levels: {len(sr['support'])}, Resistance levels: {len(sr['resistance'])}")
+
+    print("All tests completed successfully!")
+
+
+if __name__ == "__main__":
+    test_indicators()

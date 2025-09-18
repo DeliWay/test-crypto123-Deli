@@ -35,7 +35,7 @@ from .analysis_engine import (
     SignalStrength
 )
 
-from . import indicators
+from .indicators.indicators import logger
 from . import signals
 
 __all__ = [

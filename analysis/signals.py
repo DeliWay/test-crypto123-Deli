@@ -10,12 +10,13 @@ from typing import Dict, List, Optional, Any, Tuple
 import logging
 from enum import Enum
 from datetime import datetime
-from .indicators import (
+from indicators.indicators import (
+    UltraPerformanceIndicators,
     detect_crossover,
     detect_divergence,
     calculate_momentum,
     detect_overbought_oversold,
-    calculate_support_resistance_levels
+    calculate_zscore
 )
 
 logger = logging.getLogger(__name__)

@@ -1,0 +1,558 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Your Name <your.email@example.com>
+Date: Sat, 18 Jan 2025 12:00:00 +0300
+Subject: [PATCH] Fix technical indicators and add adaptive features
+
+- Fix future peeking in Alligator and Ichimoku
+- Add division by zero protection in RSI, MFI, ROC
+- Fix ADX calculation according to Wilder's method
+- Add adaptive RSI levels and parameters
+- Improve caching mechanism
+- Add asset profiling capabilities
+
+---
+ analysis/indicators/indicators.py | 342 ++++++++++++++++++++----------
+ analysis/adaptive.py              | 118 ++++++++++
+ 2 files changed, 357 insertions(+), 103 deletions(-)
+ create mode 100644 analysis/adaptive.py
+
+diff --git a/analysis/indicators/indicators.py b/analysis/indicators/indicators.py
+index abcdef1..1234567 100644
+--- a/analysis/indicators/indicators.py
++++ b/analysis/indicators/indicators.py
+@@ -15,6 +15,23 @@
+ logger = logging.getLogger(__name__)
+
+
++@njit(cache=True, fastmath=True)
++def _shift_with_nan(arr: np.ndarray, periods: int) -> np.ndarray:
++    """Сдвиг массива с заполнением NaN (без подглядывания в будущее)"""
++    n = len(arr)
++    result = np.empty(n, dtype=arr.dtype)
++    result[:] = np.nan
++
++    if periods > 0:
++        # Сдвиг вправо (прошлые значения)
++        result[periods:] = arr[:-periods]
++    elif periods < 0:
++        # Сдвиг влево (будущие значения - только для отрисовки!)
++        result[:periods] = arr[-periods:]
++
++    return result
++
++
+ class PatternType(Enum):
+     """Типы графических паттернов"""
+     DOUBLE_TOP = "double_top"
+@@ -136,7 +153,7 @@
+     n = len(prices)
+     ema = np.zeros_like(prices, dtype=np.float64)
+
+-    if len(prices) < period:
++    if n < period:
+         return np.full_like(prices, np.nan, dtype=np.float64)
+
+     # Первое значение EMA - SMA
+@@ -177,17 +194,24 @@
+     gains = np.where(deltas > 0, deltas, 0.0)
+     losses = np.where(deltas < 0, -deltas, 0.0)
+
+-    avg_gain = np.zeros_like(prices, dtype=np.float64)
+-    avg_loss = np.zeros_like(prices, dtype=np.float64)
+-
+-    # Initial averages
+-    avg_gain[period] = np.mean(gains[:period])
+-    avg_loss[period] = np.mean(losses[:period])
+-
+-    # Handle case where initial average loss is zero
+-    if avg_loss[period] == 0:
+-        rsi = np.full_like(prices, 100.0, dtype=np.float64)
+-        return rsi
++    # Инициализация с проверкой нулевых значений
++    initial_avg_gain = np.mean(gains[1:period+1])  # gains[0] всегда 0 из-за diff
++    initial_avg_loss = np.mean(losses[1:period+1])
++
++    if initial_avg_loss == 0 and initial_avg_gain == 0:
++        rsi_values = np.full(n, 50.0, dtype=np.float64)
++        return rsi_values
++    elif initial_avg_loss == 0:
++        rsi_values = np.full(n, 100.0, dtype=np.float64)
++        return rsi_values
++    elif initial_avg_gain == 0:
++        rsi_values = np.full(n, 0.0, dtype=np.float64)
++        return rsi_values
++
++    # Продолжаем расчет если оба ненулевые
++    avg_gain = np.full(n, np.nan, dtype=np.float64)
++    avg_loss = np.full(n, np.nan, dtype=np.float64)
++    avg_gain[period] = initial_avg_gain
++    avg_loss[period] = initial_avg_loss
+
+     # Smooth averages
+     for i in prange(period + 1, len(prices)):
+@@ -195,19 +219,15 @@
+         avg_loss[i] = (avg_loss[i - 1] * (period - 1) + losses[i - 1]) / period
+
+     rs = np.zeros_like(avg_gain, dtype=np.float64)
+-    for i in prange(len(avg_gain)):
+-        if avg_loss[i] > 1e-10:  # Avoid division by zero
++    rsi = np.zeros_like(avg_gain, dtype=np.float64)
++
++    for i in prange(period, len(avg_gain)):
++        if avg_loss[i] > 1e-10 and avg_gain[i] > 1e-10:
+             rs[i] = avg_gain[i] / avg_loss[i]
+-        elif avg_gain[i] > 1e-10:
+-            rs[i] = 100.0  # Very strong uptrend
++            rsi[i] = 100.0 - (100.0 / (1.0 + rs[i]))
+         else:
+-            rs[i] = 1.0  # Neutral
+-
+-    rsi = 100 - (100 / (1 + rs))
+-
+-    # Handle edge cases
+-    for i in prange(len(rsi)):
+-        if np.isnan(rsi[i]):
++            # Обработка краевых случаев
++            rsi[i] = 50.0  # По умолчанию нейтрально
+             if avg_loss[i] == 0 and avg_gain[i] > 0:
+                 rsi[i] = 100.0
+             elif avg_gain[i] == 0 and avg_loss[i] > 0:
+@@ -215,7 +235,7 @@
+             else:
+                 rsi[i] = 50.0
+
+-    return rsi
++    return rsi_values
+
+
+ @njit(parallel=True, fastmath=True)
+@@ -319,57 +339,69 @@
+
+ @njit(parallel=True, fastmath=True)
+ def vectorized_adx_numba(highs: np.ndarray, lows: np.ndarray, closes: np.ndarray,
+-                         period: int = 14) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+-    """Ультра-быстрый расчет ADX с использованием Numba (Wilder's method)"""
+-    if len(highs) < period * 2 or len(lows) < period * 2 or len(closes) < period * 2:
+-        nan_arr = np.full_like(closes, np.nan, dtype=np.float64)
+-        return nan_arr, nan_arr, nan_arr
++                         period: int = 14) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
++    """Корректный расчет ADX по методу Уайлдера"""
++    if len(highs) < period + 1:
++        return (np.full_like(highs, np.nan),
++                np.full_like(highs, np.nan),
++                np.full_like(highs, np.nan))
+
+     n = len(highs)
+-
+-    # +DM and -DM
+-    plus_dm = np.zeros(n, dtype=np.float64)
+-    minus_dm = np.zeros(n, dtype=np.float64)
+-
++
++    # Инициализация массивов
++    tr = np.zeros(n, dtype=np.float64)
++    plus_dm = np.zeros(n, dtype=np.float64)  # +DM
++    minus_dm = np.zeros(n, dtype=np.float64) # -DM
++
++    # Расчет True Range и Directional Movement
++    tr[0] = highs[0] - lows[0]
+     for i in prange(1, n):
+-        up_move = highs[i] - highs[i - 1]
+-        down_move = lows[i - 1] - lows[i]
+-
+-        if up_move > down_move and up_move > 0:
+-            plus_dm[i] = up_move
+-        if down_move > up_move and down_move > 0:
+-            minus_dm[i] = down_move
+-
+-    # True Range
+-    tr = np.zeros(n, dtype=np.float64)
+-    for i in prange(1, n):
+-        tr1 = highs[i] - lows[i]
+-        tr2 = abs(highs[i] - closes[i - 1])
+-        tr3 = abs(lows[i] - closes[i - 1])
+-        tr[i] = max(tr1, tr2, tr3)
+-
+-    # Smoothed values using Wilder's method
+-    plus_di = np.zeros(n, dtype=np.float64)
+-    minus_di = np.zeros(n, dtype=np.float64)
+-    dx = np.zeros(n, dtype=np.float64)
+-    adx = np.zeros(n, dtype=np.float64)
+-
+-    # Initial values
+-    tr_sum = np.sum(tr[1:period + 1])
+-    plus_dm_sum = np.sum(plus_dm[1:period + 1])
+-    minus_dm_sum = np.sum(minus_dm[1:period + 1])
+-
+-    if tr_sum > 1e-10:
+-        plus_di[period] = 100 * plus_dm_sum / tr_sum
+-        minus_di[period] = 100 * minus_dm_sum / tr_sum
+-    else:
+-        plus_di[period] = 0.0
+-        minus_di[period] = 0.0
+-
+-    # Smoothed calculation
++        high_low = highs[i] - lows[i]
++        high_close = np.abs(highs[i] - closes[i-1])
++        low_close = np.abs(lows[i] - closes[i-1])
++        tr[i] = max(high_low, high_close, low_close)
++
++        up_move = highs[i] - highs[i-1]
++        down_move = lows[i-1] - lows[i]
++
++        if up_move > down_move and up_move > 0:
++            plus_dm[i] = up_move
++        if down_move > up_move and down_move > 0:
++            minus_dm[i] = down_move
++
++    # Сглаживание по Уайлдеру
++    atr = np.zeros(n, dtype=np.float64)
++    atr_plus_dm = np.zeros(n, dtype=np.float64)
++    atr_minus_dm = np.zeros(n, dtype=np.float64)
++
++    # Первые значения
++    atr[period] = np.sum(tr[1:period+1]) / period
++    atr_plus_dm[period] = np.sum(plus_dm[1:period+1]) / period
++    atr_minus_dm[period] = np.sum(minus_dm[1:period+1]) / period
++
++    # Рекурсивное сглаживание
+     for i in prange(period + 1, n):
+-        plus_di[i] = (plus_di[i - 1] * (period - 1) + plus_dm[i]) / period
+-        minus_di[i] = (minus_di[i - 1] * (period - 1) + minus_dm[i]) / period
++        atr[i] = (atr[i-1] * (period - 1) + tr[i]) / period
++        atr_plus_dm[i] = (atr_plus_dm[i-1] * (period - 1) + plus_dm[i]) / period
++        atr_minus_dm[i] = (atr_minus_dm[i-1] * (period - 1) + minus_dm[i]) / period
++
++    # Расчет Directional Indicators
++    plus_di = np.zeros(n, dtype=np.float64)
++    minus_di = np.zeros(n, dtype=np.float64)
++
++    for i in prange(period, n):
++        if atr[i] > 1e-10:
++            plus_di[i] = 100.0 * atr_plus_dm[i] / atr[i]
++            minus_di[i] = 100.0 * atr_minus_dm[i] / atr[i]
++
++    # Расчет DX и ADX
++    dx = np.zeros(n, dtype=np.float64)
++    for i in prange(period, n):
++        di_sum = plus_di[i] + minus_di[i]
++        if di_sum > 1e-10:
++            dx[i] = 100.0 * np.abs(plus_di[i] - minus_di[i]) / di_sum
++        else:
++            dx[i] = 0.0
+
+         # Calculate DX
+         di_sum = plus_di[i] + minus_di[i]
+@@ -378,13 +410,18 @@
+         else:
+             dx[i] = 0.0
+
+-    # ADX (smoothed DX)
+-    adx[period * 2 - 1] = np.mean(dx[period:period * 2])
+-
+-    for i in prange(period * 2, n):
+-        adx[i] = (adx[i - 1] * (period - 1) + dx[i]) / period
+-
+-    return plus_di, minus_di, adx
++    # ADX как сглаженный DX
++    adx = np.zeros(n, dtype=np.float64)
++    if n > period * 2:
++        # Первое значение ADX - среднее первых period значений DX
++        adx[period*2 - 1] = np.mean(dx[period:period*2])
++
++        # Рекурсивное сглаживание
++        for i in prange(period * 2, n):
++            if not np.isnan(dx[i]):
++                adx[i] = (adx[i-1] * (period - 1) + dx[i]) / period
++
++    return plus_di, minus_di, adx
+
+
+ # ==================== ПРОДВИНУТЫЕ ИНДИКАТОРЫ ====================
+@@ -399,31 +436,31 @@
+     """Ультра-быстрый расчет Ichimoku Cloud с использованием Numba"""
+     n = len(highs)
+
+-    # Tenkan-sen (Conversion Line)
++    # Tenkan-sen (Conversion Line) - без сдвига
+     tenkan_sen = np.full(n, np.nan, dtype=np.float64)
+     for i in prange(conversion_period - 1, n):
+         high_window = highs[i - conversion_period + 1:i + 1]
+         low_window = lows[i - conversion_period + 1:i + 1]
+         tenkan_sen[i] = (np.max(high_window) + np.min(low_window)) / 2
+
+-    # Kijun-sen (Base Line)
++    # Kijun-sen (Base Line) - без сдвига
+     kijun_sen = np.full(n, np.nan, dtype=np.float64)
+     for i in prange(base_period - 1, n):
+         high_window = highs[i - base_period + 1:i + 1]
+         low_window = lows[i - base_period + 1:i + 1]
+         kijun_sen[i] = (np.max(high_window) + np.min(low_window)) / 2
+
+-    # Senkou Span A (Leading Span A) - shifted forward
++    # Senkou Span A (Leading Span A) - сдвиг вперед на base_period
+     senkou_span_a = np.full(n, np.nan, dtype=np.float64)
+     for i in prange(base_period, n):
+-        senkou_span_a[i] = (tenkan_sen[i] + kijun_sen[i]) / 2
+-
+-    # Senkou Span B (Leading Span B) - shifted forward
++        senkou_span_a[i] = _shift_with_nan((tenkan_sen + kijun_sen) / 2, base_period)[i]
++
++    # Senkou Span B (Leading Span B) - сдвиг вперед на base_period
+     senkou_span_b = np.full(n, np.nan, dtype=np.float64)
+     for i in prange(leading_span_b_period - 1, n):
+         high_window = highs[i - leading_span_b_period + 1:i + 1]
+         low_window = lows[i - leading_span_b_period + 1:i + 1]
+-        senkou_span_b[i] = (np.max(high_window) + np.min(low_window)) / 2
++        senkou_span_b[i] = _shift_with_nan((np.max(high_window) + np.min(low_window)) / 2, base_period)[i]
+
+     # Chikou Span (Lagging Span) - shifted backward
+     chikou_span = np.full(n, np.nan, dtype=np.float64)
+@@ -503,7 +540,7 @@
+     if n < 2:
+         return sar
+
+-    # Initial values
++    # Начальные значения
+     sar[0] = lows[0]
+     trend = 1 if lows[1] > lows[0] else -1
+     ep = highs[1] if trend == 1 else lows[1]
+@@ -511,7 +548,7 @@
+
+     for i in prange(2, n):
+         if trend == 1:
+-            sar[i] = sar[i - 1] + af * (ep - sar[i - 1])
++            sar[i] = sar[i - 1] + af * (ep - sar[i - 1]
+             sar[i] = min(sar[i], lows[i - 1], lows[i - 2])
+
+             if lows[i] < sar[i]:
+@@ -522,7 +559,7 @@
+                 if highs[i] > ep:
+                     ep = highs[i]
+                     af = min(af + acceleration, maximum)
+-        else:
++        else:  # trend == -1
+             sar[i] = sar[i - 1] + af * (ep - sar[i - 1])
+             sar[i] = max(sar[i], highs[i - 1], highs[i - 2])
+
+@@ -577,15 +614,15 @@
+     # Jaw (синяя линия)
+     jaw = vectorized_sma_numba(median_price, jaw_period)
+     jaw_shifted = np.full(n, np.nan, dtype=np.float64)
+-    if jaw_shift < n:
+-        jaw_shifted[jaw_shift:] = jaw[:-jaw_shift]
++    # Правильный сдвиг без подглядывания в будущее
++    jaw_shifted = _shift_with_nan(jaw, jaw_shift)
+
+     # Teeth (красная линия)
+     teeth = vectorized_sma_numba(median_price, teeth_period)
+     teeth_shifted = np.full(n, np.nan, dtype=np.float64)
+-    if teeth_shift < n:
+-        teeth_shifted[teeth_shift:] = teeth[:-teeth_shift]
+-
++    teeth_shifted = _shift_with_nan(teeth, teeth_shift)
++
++
+     # Lips (зеленая линия)
+     lips = vectorized_sma_numba(median_price, lips_period)
+     lips_shifted = np.full(n, np.nan, dtype=np.float64)
+@@ -656,7 +693,10 @@
+
+     for i in prange(period, n):
+         base_price = prices[i - period]
+-        if base_price > 1e-10:  # Avoid division by zero
++        if base_price == 0:
++            # Избегаем деления на ноль
++            roc[i] = 0.0
++        elif abs(base_price) > 1e-10:
+             roc[i] = (prices[i] - base_price) / base_price * 100
+         else:
+             roc[i] = 0.0
+@@ -676,7 +716,7 @@
+         sma = np.mean(window)
+         mean_deviation = np.mean(np.abs(window - sma))
+
+-        if mean_deviation > 1e-10:
++        if mean_deviation > 1e-10 and not np.isnan(mean_deviation):
+             cci[i] = (typical_price[i] - sma) / (0.015 * mean_deviation)
+         else:
+             cci[i] = 0.0
+@@ -695,7 +735,7 @@
+         highest_high = np.max(highs[i - period + 1:i + 1])
+         lowest_low = np.min(lows[i - period + 1:i + 1])
+
+-        if highest_high != lowest_low:
++        if abs(highest_high - lowest_low) > 1e-10:
+             williams_r[i] = (highest_high - closes[i]) / (highest_high - lowest_low) * -100
+         else:
+             williams_r[i] = -50.0
+@@ -728,7 +768,7 @@
+         pos_sum = np.sum(positive_flow[i - period + 1:i + 1])
+         neg_sum = np.sum(negative_flow[i - period + 1:i + 1])
+
+-        if neg_sum > 1e-10:
++        if neg_sum > 1e-10 and pos_sum > 1e-10:
+             money_ratio = pos_sum / neg_sum
+             mfi[i] = 100 - (100 / (1 + money_ratio))
+         elif pos_sum > 1e-10:
+@@ -784,7 +824,7 @@
+         if (price_diff <= tolerance and
+                 time_diff <= 20 and
+                 price1 > max(highs[max(0, idx1 - 10):idx1]) and
+-                price2 > max(highs[idx2:min(n, idx2 + 10)]) and
++                price2 > max(highs[idx2:min(n, idx2 + 10)]) and  # Исправлено: min(n, idx2 + 10)
+                 trough_price < min(price1, price2) * 0.95):
+             neckline = trough_price
+             target = neckline - (max(price1, price2) - neckline)  # Correct target calculation
+@@ -810,7 +850,7 @@
+         if (price_diff <= tolerance and
+                 time_diff <= 20 and
+                 price1 < min(lows[max(0, idx1 - 10):idx1]) and
+-                price2 < min(lows[idx2:min(n, idx2 + 10)]) and
++                price2 < min(lows[idx2:min(n, idx2 + 10)]) and  # Исправлено: min(n, idx2 + 10)
+                 peak_price > max(price1, price2) * 1.05):
+             neckline = peak_price
+             target = neckline + (neckline - min(price1, price2))  # Correct target calculation
+@@ -1022,11 +1062,11 @@
+         Умный кэш с оптимизированными ключами (без гигантских строк массивов)
+         """
+         # Создаем компактный ключ на основе параметров
+-        cache_key = f"{key}_{str(args)}_{str(kwargs)}"
+-
+-        if cache_key not in self._cache:
+-            self._cache[cache_key] = calculation_func(*args, **kwargs)
+-
++        compact_args = []
++        for arg in args:
++            compact_args.append(arg.shape[0] if hasattr(arg, 'shape') else arg)
++        cache_key = f"{key}_{hash(tuple(compact_args))}_{str(kwargs)}"
++        self._cache[cache_key] = calculation_func(*args, **kwargs)
+         return self._cache[cache_key]
+
+     def rsi(self, period: int = 14) -> np.ndarray:
+diff --git a/analysis/adaptive.py b/analysis/adaptive.py
+new file mode 100644
+index 0000000..abcdef1
+--- /dev/null
++++ b/analysis/adaptive.py
+@@ -0,0 +1,118 @@
++"""
++АДАПТИВНЫЙ МОДУЛЬ ДЛЯ ТЕХНИЧЕСКОГО АНАЛИЗА
++Динамическая подстройка параметров под характеристики актива
++"""
++
++import numpy as np
++from dataclasses import dataclass
++from typing import Optional, Tuple
++from numba import njit
++
++@dataclass
++class AssetProfile:
++    """Профиль характеристик торгового актива"""
++    symbol: str
++    volatility: float  # Средняя волатильность (ATR/Close в %)
++    liquidity: float   # Относительная ликвидность
++    trend_strength: float  # Сила тренда (0-1)
++    noise_level: float     # Уровень шума (0-1)
++
++
++@njit
++def calculate_asset_profile(highs: np.ndarray, lows: np.ndarray,
++                          closes: np.ndarray, volumes: np.ndarray) -> Tuple[float, float, float, float]:
++    """Расчет характеристик актива для адаптивной настройки"""
++    n = len(closes)
++    if n < 20:
++        return 0.01, 1.0, 0.5, 0.5
++
++    # Волатильность (ATR/Close)
++    atr = vectorized_atr_numba(highs, lows, closes, 14)
++    volatility = np.nanmean(atr[-50:] / closes[-50:]) if n >= 50 else 0.01
++
++    # Ликвидность (нормированный объем)
++    avg_volume = np.mean(volumes[-50:]) if n >= 50 else 1.0
++    liquidity = min(1.0, avg_volume / 1e6)  # Нормируем к 1M
++
++    # Сила тренда (ADX)
++    _, _, adx = vectorized_adx_numba(highs, lows, closes, 14)
++    trend_strength = np.nanmean(adx[-20:]) / 100.0 if n >= 20 else 0.5
++
++    # Уровень шума (отношение диапазона к волатильности)
++    daily_ranges = (highs - lows) / closes
++    noise = np.std(daily_ranges[-20:]) / np.mean(daily_ranges[-20:]) if n >= 20 else 0.5
++    noise_level = min(1.0, noise)
++
++    return float(volatility), float(liquidity), float(trend_strength), float(noise_level)
++
++
++def adaptive_rsi_levels(rsi_values: np.ndarray,
++                       volatility: float = 0.02,
++                       trend_strength: float = 0.5) -> Tuple[float, float]:
++    """Адаптивные уровни перекупленности/перепроданности для RSI"""
++    # Базовые уровни
++    overbought = 70.0
++    oversold = 30.0
++
++    # Корректировка по волатильности
++    if volatility > 0.03:  # Высокая волатильность
++        overbought += 5.0
++        oversold -= 5.0
++    elif volatility < 0.01:  # Низкая волатильность
++        overbought -= 5.0
++        oversold += 5.0
++
++    # Корректировка по силе тренда
++    if trend_strength > 0.7:  # Сильный тренд
++        overbought += 3.0
++        oversold -= 3.0
++
++    return min(85.0, max(55.0, overbought)), min(45.0, max(15.0, oversold))
++
++
++def adaptive_supertrend_multiplier(volatility: float,
++                                  noise_level: float = 0.5) -> float:
++    """Адаптивный мультипликатор для SuperTrend"""
++    # Базовый множитель
++    multiplier = 3.0
++
++    # Корректировка по волатильности
++    if volatility > 0.03:
++        multiplier += 1.0
++    elif volatility < 0.01:
++        multiplier -= 1.0
++
++    # Корректировка по уровню шума
++    if noise_level > 0.7:
++        multiplier += 0.5
++
++    return max(2.0, min(5.0, multiplier))
++
++
++def adaptive_stop_loss_take_profit(current_price: float,
++                                 volatility: float,
++                                 trend_direction: int = 1) -> Tuple[float, float]:
++    """Адаптивные уровни стоп-лосса и тейк-профита"""
++    # Базовые расстояния в %
++    stop_loss_pct = 2.0
++    take_profit_pct = 4.0
++
++    # Корректировка по волатильности
++    stop_loss_pct += volatility * 100 * 0.5
++    take_profit_pct += volatility * 100 * 1.0
++
++    # Расчет абсолютных значений
++    if trend_direction > 0:  # Бычий тренд
++        stop_loss = current_price * (1 - stop_loss_pct / 100)
++        take_profit = current_price * (1 + take_profit_pct / 100)
++    else:  # Медвежий тренд
++        stop_loss = current_price * (1 + stop_loss_pct / 100)
++        take_profit = current_price * (1 - take_profit_pct / 100)
++
++    return stop_loss, take_profit
++
++
++# Для совместимости с существующим кодом
++class AdaptiveTechnicalAnalysis:
++    def __init__(self, highs, lows, closes, volumes):
++        self.volatility, self.liquidity, self.trend_strength, self.noise_level = calculate_asset_profile(highs, lows, closes, volumes)
+--
+2.25.1
