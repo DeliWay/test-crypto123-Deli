@@ -805,36 +805,69 @@ async def close_bybit_client():
     await _client.close()
 
 # Асинхронные функции
-async def get_available_symbols(quote_coin: str = 'USDT', source: str = 'bybit') -> List[str]:
+async def get_available_symbols(quote_coin: str = 'USDT', source: str = None) -> List[str]:
     """Получение доступных символов"""
+    exchange = None
+    if source:
+        try:
+            # Ищем enum по значению (нижний регистр)
+            exchange = next((e for e in ExchangeSource if e.value == source.lower()), None)
+        except:
+            logger.warning(f"Invalid exchange source: {source}")
     return await _client.get_spot_symbols(quote_coin)
 
+# Исправьте оберточные функции:
 async def get_market_data(symbol: str, interval: str = '1h', limit: int = 500,
-                         source: str = 'bybit') -> Optional[pd.DataFrame]:
+                         source: str = None) -> Optional[pd.DataFrame]:
     """Получение рыночных данных"""
-    exchange = ExchangeSource(source.upper()) if source else None
+    exchange = None
+    if source:
+        try:
+            exchange = next((e for e in ExchangeSource if e.value == source.lower()), None)
+        except:
+            logger.warning(f"Invalid exchange source: {source}")
     return await _client.get_klines(symbol, interval, limit, exchange)
 
-async def get_ticker_info(symbol: str, source: str = 'bybit') -> Optional[Dict]:
+async def get_ticker_info(symbol: str, source: str = None) -> Optional[Dict]:
     """Получение информации о тикере"""
-    exchange = ExchangeSource(source.upper()) if source else None
+    exchange = None
+    if source:
+        try:
+            exchange = next((e for e in ExchangeSource if e.value == source.lower()), None)
+        except:
+            logger.warning(f"Invalid exchange source: {source}")
     return await _client.get_ticker_info(symbol, exchange)
 
-async def get_orderbook(symbol: str, limit: int = 25, source: str = 'bybit') -> Optional[Dict]:
+async def get_orderbook(symbol: str, limit: int = 25, source: str = None) -> Optional[Dict]:
     """Получение стакана заявок"""
-    exchange = ExchangeSource(source.upper()) if source else None
+    exchange = None
+    if source:
+        try:
+            exchange = next((e for e in ExchangeSource if e.value == source.lower()), None)
+        except:
+            logger.warning(f"Invalid exchange source: {source}")
     return await _client.get_orderbook(symbol, limit, exchange)
 
 async def get_multiple_timeframes(symbol: str, timeframes: List[str] = None,
-                                source: str = 'bybit') -> Dict[str, Optional[pd.DataFrame]]:
+                                source: str = None) -> Dict[str, Optional[pd.DataFrame]]:
     """Получение данных по нескольким таймфреймам"""
-    exchange = ExchangeSource(source.upper()) if source else None
+    exchange = None
+    if source:
+        try:
+            exchange = next((e for e in ExchangeSource if e.value == source.lower()), None)
+        except:
+            logger.warning(f"Invalid exchange source: {source}")
     return await _client.get_multiple_timeframes(symbol, timeframes)
 
 async def get_batch_symbols_data(symbols: List[str], interval: str = '1h',
-                               limit: int = 100, source: str = 'bybit') -> Dict[str, Optional[pd.DataFrame]]:
+                               limit: int = 100, source: str = None) -> Dict[str, Optional[pd.DataFrame]]:
     """Пакетное получение данных"""
-    exchange = ExchangeSource(source.upper()) if source else None
+    exchange = None
+    if source:
+        try:
+            exchange = next((e for e in ExchangeSource if e.value == source.lower()), None)
+        except:
+            logger.warning(f"Invalid exchange source: {source}")
     return await _client.get_batch_klines(symbols, interval, limit)
 
 # Синхронные функции для обратной совместимости

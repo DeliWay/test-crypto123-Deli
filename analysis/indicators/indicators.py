@@ -175,6 +175,7 @@ def vectorized_bollinger_bands_numba(prices: np.ndarray, period: int = 20,
     upper_band = np.zeros_like(prices, dtype=np.float64)
     lower_band = np.zeros_like(prices, dtype=np.float64)
 
+
     for i in prange(period - 1, len(prices)):
         window = prices[i - period + 1:i + 1]
         middle_band[i] = np.mean(window)
@@ -1042,7 +1043,10 @@ def calculate_fibonacci_levels(high: float, low: float) -> Dict[str, float]:
         'retracement_786': high - price_range * 0.786,
         'extension_127': high + price_range * 0.272,
         'extension_161': high + price_range * 0.618,
-        'extension_261': high + price_range * 1.618
+        'extension_261': high + price_range * 1.618,
+        'extension_127': high + price_range * 1.272,
+        'extension_161': high + price_range * 1.618,
+        'extension_261': high + price_range * 2.618
     }
 
 
@@ -1177,18 +1181,19 @@ class TechnicalIndicators:
     def ichimoku(self, conversion_period: int = 9, base_period: int = 26,
                  leading_span_b_period: int = 52) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Ультра-быстрый расчет Ichimoku Cloud с использованием Numba"""
-        highs = self.highs
-        lows = self.lows
+        highs = self.data['high'].values
+        lows = self.data['low'].values
+        closes = self.data['close'].values
 
         # Tenkan-sen (Conversion Line)
-        tenkan_sen = np.full_like(highs, np.nan, dtype=np.float64)
+        tenkan_sen = np.full_like(highs.shape, np.nan, dtype=np.float64)
         for i in range(conversion_period - 1, len(highs)):
             high_window = highs[i - conversion_period + 1:i + 1]
             low_window = lows[i - conversion_period + 1:i + 1]
             tenkan_sen[i] = (np.max(high_window) + np.min(low_window)) / 2
 
         # Kijun-sen (Base Line)
-        kijun_sen = np.full_like(highs, np.nan, dtype=np.float64)
+        kijun_sen = np.full_like(highs.shape, np.nan, dtype=np.float64)
         for i in range(base_period - 1, len(highs)):
             high_window = highs[i - base_period + 1:i + 1]
             low_window = lows[i - base_period + 1:i + 1]
@@ -1206,7 +1211,7 @@ class TechnicalIndicators:
         senkou_span_b = _shift_with_nan(senkou_span_b, base_period)
 
         # Chikou Span (Lagging Span) - shifted backward
-        chikou_span = _shift_with_nan(self.closes, -base_period)
+        chikou_span = _shift_with_nan(closes, -base_period)
 
         return tenkan_sen, kijun_sen, senkou_span_a, senkou_span_b, chikou_span
 

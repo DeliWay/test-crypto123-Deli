@@ -30,7 +30,6 @@ from backend.bybit_client import (
 
 # Импорт мощных индикаторов из indicators.py
 from .indicators.indicators import (
-    UltraPerformanceIndicators,
     PatternType,
     FibonacciLevel,
     vectorized_ema_numba,
