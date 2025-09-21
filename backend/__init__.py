@@ -1,9 +1,4 @@
-"""
-ULTRA-PERFORMANCE TRADING BACKEND
-Инициализация модуля с оптимизированными импортами
-"""
-
-from .bybit_client import (
+from backend.bybit_client import (
     UltraBybitClient,
     init_bybit_client,
     close_bybit_client,
@@ -17,8 +12,6 @@ from .bybit_client import (
     get_market_data_sync,
     get_ticker_info_sync,
     get_orderbook_sync,
-    get_multiple_timeframes_sync,
-    get_batch_symbols_data_sync,
     klines,
     ExchangeSource,
     MarketDataType
@@ -38,29 +31,34 @@ __all__ = [
     'get_market_data_sync',
     'get_ticker_info_sync',
     'get_orderbook_sync',
-    'get_multiple_timeframes_sync',
-    'get_batch_symbols_data_sync',
     'klines',
     'ExchangeSource',
     'MarketDataType'
 ]
 
-# Автоматическая инициализация при импорте
+# ---- ВАЖНО: Авто-инициализация только по флагу среды, без блокировки цикла ----
+import os
 import asyncio
 
 async def _auto_init():
-    """Автоматическая инициализация клиента"""
     try:
         await init_bybit_client()
+        print("✅ Bybit client auto-initialized successfully")
     except Exception as e:
-        print(f"Auto-init warning: {e}")
+        print(f"⚠️  Bybit client auto-init warning: {e}")
 
-# Запуск инициализации в фоне
-try:
-    loop = asyncio.get_event_loop()
-    if loop.is_running():
-        asyncio.create_task(_auto_init())
-    else:
-        loop.run_until_complete(_auto_init())
-except:
-    pass
+def _maybe_autoinit():
+    # По умолчанию ОТКЛЮЧЕНО (без флага — никакого старта в тестах/импортах)
+    if os.getenv("BYBIT_CLIENT_AUTOINIT", "0") != "1":
+        return
+    # Если цикл НЕ запущен — используем безопасный asyncio.run (не блокируем pytest loop)
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(_auto_init())
+        return
+    # Если цикл уже идёт (например, внутри приложения) — просто создаём задачу
+    loop.create_task(_auto_init())
+
+# Вызов не навредит в тестах, т.к. по умолчанию флаг = 0
+_maybe_autoinit()
