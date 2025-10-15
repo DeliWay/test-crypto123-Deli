@@ -1,14 +1,43 @@
 {
-  "title": "Crypto Dashboard",
-  "symbol": "Symbol",
-  "interval": "Interval",
-  "theme": "Theme",
-  "language": "Language",
-  "ticker": "Ticker",
-  "calculator": "Calculator",
-  "signals": "Signals",
-  "export": "Export CSV",
-  "home": "Home",
-  "analysis": "Analysis",
-  "patterns": "Patterns"
-}
+    "nav": {
+      "home": "Home",
+      "analytics": "Analytics",
+      "patterns": "Patterns",
+      "dashboard": "Dashboard",
+      "docs": "Docs",
+      "community": "Community"
+    },
+    "cta": {
+      "buy": "Get Subscription",
+      "signin": "Sign in",
+      "profile": "Profile"
+    },
+    "sub": {
+      "title": "Access premium signals",
+      "subtitle": "On-chain, order flow, private patterns",
+      "point1": "Low-latency signals",
+      "point2": "Advanced patterns & quizzes",
+      "point3": "Alerts to Telegram / WebPush",
+      "ctaPrimary": "Upgrade",
+      "ctaSecondary": "Learn more"
+    },
+    "home": {
+      "hero": {
+        "title": "Crypto analytics that never sleeps",
+        "subtitle": "Signals, patterns, and dashboards — all in one place",
+        "ctaPrimary": "Open Analytics",
+        "ctaSecondary": "Get Subscription"
+      },
+      "why": {
+        "speed": { "title": "Signal speed", "text": "Low latency, multi-timeframe." },
+        "open":  { "title": "Open methodology", "text": "Formulas, rules, and assumptions in Docs." },
+        "private": { "title": "Private patterns", "text": "Advanced setups for subscribers." }
+      },
+      "how": {
+        "connect": { "title": "Connect account", "text": "Google sign-in, secure tokens." },
+        "study":   { "title": "Study signals", "text": "Analytics, on-chain, and order flow." },
+        "alerts":  { "title": "Configure alerts", "text": "Email, Telegram, WebPush — no noise." }
+      }
+    }
+  }
+  
