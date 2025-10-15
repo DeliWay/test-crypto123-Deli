@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <title>Ошибка входа — CryptoLab</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+</head>
+<body>
+  {% include 'partials/_header.html' %}
+  <main class="container" style="padding:32px 16px;">
+    <div class="card">
+      <h2>Не удалось выполнить вход</h2>
+      <p>Причина: <code>{{ reason }}</code></p>
+      <div style="margin-top:16px">
+        <a class="btn primary" href="{{ url_for('auth_login') }}">Повторить вход</a>
+        <a class="btn subtle"  href="{{ url_for('index') }}">На главную</a>
+      </div>
+    </div>
+  </main>
+  <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+</body>
+</html>

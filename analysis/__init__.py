@@ -31,7 +31,6 @@ from .analysis_engine import (
 
     # Константы
     AnalysisStrategy,
-    PatternType,
     SignalStrength
 )
 
@@ -54,7 +53,6 @@ __all__ = [
     'init_analysis_engine',
     'close_analysis_engine',
     'AnalysisStrategy',
-    'PatternType',
     'SignalStrength',
     'indicators',
     'signals'

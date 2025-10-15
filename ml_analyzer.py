@@ -61,7 +61,7 @@ class CryptoAnalyzer:
         """Анализ символа с ML"""
         try:
             # Используем базовые данные для быстрого предсказания
-            from backend.bybit_client import bybit_client
+            from backend.exchange_data import bybit_client
 
             market_data = await bybit_client.get_market_data_sync(symbol, timeframe, 100)
             if market_data is None:

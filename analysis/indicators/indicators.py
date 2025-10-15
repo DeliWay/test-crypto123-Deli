@@ -1034,16 +1034,12 @@ def detect_price_channels(highs: np.ndarray, lows: np.ndarray, period: int = 20)
 def calculate_fibonacci_levels(high: float, low: float) -> Dict[str, float]:
     """Расчет уровней Фибоначчи для заданного диапазона"""
     price_range = high - low
-
     return {
         'retracement_236': high - price_range * 0.236,
         'retracement_382': high - price_range * 0.382,
         'retracement_500': high - price_range * 0.5,
         'retracement_618': high - price_range * 0.618,
         'retracement_786': high - price_range * 0.786,
-        'extension_127': high + price_range * 0.272,
-        'extension_161': high + price_range * 0.618,
-        'extension_261': high + price_range * 1.618,
         'extension_127': high + price_range * 1.272,
         'extension_161': high + price_range * 1.618,
         'extension_261': high + price_range * 2.618
@@ -1132,23 +1128,63 @@ class TechnicalIndicators:
 
         return self._cache[cache_key]
 
-    def rsi(self, period: int = 14) -> np.ndarray:
-        """Relative Strength Index"""
-        closes = self.data['close'].values
-        return self._get_cached(f"rsi_{period}", vectorized_rsi_numba, closes, period)
+    def sma(self, series_or_period, maybe_period=None):
+        """
+        Поддержка двух сигнатур:
+          sma(series, period)  ИЛИ  sma(period) — берёт self.data['close']
+        """
+        import pandas as pd
+        if maybe_period is None:
+            series = self.data['close']
+            period = int(series_or_period)
+        else:
+            series = series_or_period
+            period = int(maybe_period)
+        return pd.Series(series, dtype='float64').rolling(period, min_periods=period).mean()
 
-    def macd(self, fast_period: int = 12, slow_period: int = 26, signal_period: int = 9) -> Tuple[
-        np.ndarray, np.ndarray, np.ndarray]:
-        """Moving Average Convergence Divergence"""
-        closes = self.data['close'].values
-        return self._get_cached(f"macd_{fast_period}_{slow_period}_{signal_period}",
-                                vectorized_macd_numba, closes, fast_period, slow_period, signal_period)
+    def ema(self, series_or_period, maybe_period=None):
+        """
+        ema(series, period) ИЛИ ema(period) — берёт self.data['close']
+        """
+        import pandas as pd
+        if maybe_period is None:
+            series = self.data['close']
+            period = int(series_or_period)
+        else:
+            series = series_or_period
+            period = int(maybe_period)
+        return pd.Series(series, dtype='float64').ewm(span=period, adjust=False, min_periods=period).mean()
 
-    def bollinger_bands(self, period: int = 20, std_dev: float = 2.0) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Bollinger Bands"""
-        closes = self.data['close'].values
-        return self._get_cached(f"bb_{period}_{std_dev}",
-                                vectorized_bollinger_bands_numba, closes, period, std_dev)
+    def rsi(self, period: int = 14):
+        import pandas as pd
+        close = pd.to_numeric(self.data['close'], errors='coerce')
+        delta = close.diff()
+        gain = delta.clip(lower=0.0)
+        loss = -delta.clip(upper=0.0)
+        avg_gain = gain.ewm(alpha=1 / period, adjust=False, min_periods=period).mean()
+        avg_loss = loss.ewm(alpha=1 / period, adjust=False, min_periods=period).mean()
+        rs = avg_gain / (avg_loss + 1e-12)
+        return 100 - (100 / (1 + rs))
+
+    def macd(self, fast: int = 12, slow: int = 26, signal: int = 9):
+        import pandas as pd
+        close = pd.to_numeric(self.data['close'], errors='coerce')
+        ema_fast = close.ewm(span=fast, adjust=False, min_periods=fast).mean()
+        ema_slow = close.ewm(span=slow, adjust=False, min_periods=slow).mean()
+        macd_line = ema_fast - ema_slow
+        signal_line = macd_line.ewm(span=signal, adjust=False, min_periods=signal).mean()
+        hist = macd_line - signal_line
+        # можно возвращать tuple — signals.py это понимает
+        return macd_line.to_numpy(), signal_line.to_numpy(), hist.to_numpy()
+
+    def bollinger_bands(self, period: int = 20, n_std: float = 2.0):
+        import pandas as pd, numpy as np
+        close = pd.to_numeric(self.data['close'], errors='coerce')
+        mid = close.rolling(period, min_periods=period).mean()
+        std = close.rolling(period, min_periods=period).std(ddof=0)
+        upper = mid + n_std * std
+        lower = mid - n_std * std
+        return upper.to_numpy(), mid.to_numpy(), lower.to_numpy()
 
     def atr(self, period: int = 14) -> np.ndarray:
         """Average True Range"""
@@ -1180,38 +1216,37 @@ class TechnicalIndicators:
 
     def ichimoku(self, conversion_period: int = 9, base_period: int = 26,
                  leading_span_b_period: int = 52) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Ультра-быстрый расчет Ichimoku Cloud с использованием Numba"""
-        highs = self.data['high'].values
-        lows = self.data['low'].values
-        closes = self.data['close'].values
+        """Ichimoku Cloud (без подглядывания в будущее)"""
+        highs = self.data['high'].values.astype(float)
+        lows = self.data['low'].values.astype(float)
+        closes = self.data['close'].values.astype(float)
+        n = len(highs)
 
-        # Tenkan-sen (Conversion Line)
-        tenkan_sen = np.full_like(highs.shape, np.nan, dtype=np.float64)
-        for i in range(conversion_period - 1, len(highs)):
-            high_window = highs[i - conversion_period + 1:i + 1]
-            low_window = lows[i - conversion_period + 1:i + 1]
-            tenkan_sen[i] = (np.max(high_window) + np.min(low_window)) / 2
+        tenkan_sen = np.full(n, np.nan, dtype=np.float64)
+        for i in range(conversion_period - 1, n):
+            hi = np.max(highs[i - conversion_period + 1:i + 1])
+            lo = np.min(lows[i - conversion_period + 1:i + 1])
+            tenkan_sen[i] = (hi + lo) / 2.0
 
-        # Kijun-sen (Base Line)
-        kijun_sen = np.full_like(highs.shape, np.nan, dtype=np.float64)
-        for i in range(base_period - 1, len(highs)):
-            high_window = highs[i - base_period + 1:i + 1]
-            low_window = lows[i - base_period + 1:i + 1]
-            kijun_sen[i] = (np.max(high_window) + np.min(low_window)) / 2
+        kijun_sen = np.full(n, np.nan, dtype=np.float64)
+        for i in range(base_period - 1, n):
+            hi = np.max(highs[i - base_period + 1:i + 1])
+            lo = np.min(lows[i - base_period + 1:i + 1])
+            kijun_sen[i] = (hi + lo) / 2.0
 
-        # Senkou Span A (Leading Span A) - сдвиг вперед на base_period
-        senkou_span_a = _shift_with_nan((tenkan_sen + kijun_sen) / 2, base_period)
+        # Span A/B сдвигаем ВПЕРЁД на base_period (визуальный лид)
+        span_a_raw = (tenkan_sen + kijun_sen) / 2.0
+        senkou_span_a = _shift_with_nan(span_a_raw, -base_period)  # отрицат. shift = вперёд при отрисовке
 
-        # Senkou Span B (Leading Span B) - сдвиг вперед на base_period
-        senkou_span_b = np.full_like(highs, np.nan, dtype=np.float64)
-        for i in range(leading_span_b_period - 1, len(highs)):
-            high_window = highs[i - leading_span_b_period + 1:i + 1]
-            low_window = lows[i - leading_span_b_period + 1:i + 1]
-            senkou_span_b[i] = (np.max(high_window) + np.min(low_window)) / 2
-        senkou_span_b = _shift_with_nan(senkou_span_b, base_period)
+        span_b_raw = np.full(n, np.nan, dtype=np.float64)
+        for i in range(leading_span_b_period - 1, n):
+            hi = np.max(highs[i - leading_span_b_period + 1:i + 1])
+            lo = np.min(lows[i - leading_span_b_period + 1:i + 1])
+            span_b_raw[i] = (hi + lo) / 2.0
+        senkou_span_b = _shift_with_nan(span_b_raw, -base_period)
 
-        # Chikou Span (Lagging Span) - shifted backward
-        chikou_span = _shift_with_nan(closes, -base_period)
+        # Chikou (Lagging) — сдвигаем НАЗАД на base_period
+        chikou_span = _shift_with_nan(closes, base_period)
 
         return tenkan_sen, kijun_sen, senkou_span_a, senkou_span_b, chikou_span
 
@@ -1237,34 +1272,59 @@ class TechnicalIndicators:
         return self._get_cached(f"parabolic_sar_{acceleration}_{maximum}",
                                 vectorized_parabolic_sar_numba, highs, lows, acceleration, maximum)
 
-    def supertrend(self, period: int = 10, multiplier: float = 3.0) -> Tuple[np.ndarray, np.ndarray]:
-        """SuperTrend"""
-        highs = self.data['high'].values
-        lows = self.data['low'].values
-        closes = self.data['close'].values
-        return self._get_cached(f"supertrend_{period}_{multiplier}",
-                                vectorized_supertrend_numba, highs, lows, closes, period, multiplier)
+    def supertrend(self, period: int = 10, multiplier: float = 3.0):
+        """Лёгкая реализация Supertrend: вернёт (линия, направление [+1/-1])"""
+        import numpy as np, pandas as pd
+        high = pd.to_numeric(self.data['high'], errors='coerce')
+        low = pd.to_numeric(self.data['low'], errors='coerce')
+        close = pd.to_numeric(self.data['close'], errors='coerce')
+
+        tr1 = (high - low)
+        tr2 = (high - close.shift()).abs()
+        tr3 = (low - close.shift()).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        atr = tr.ewm(alpha=1 / period, adjust=False, min_periods=period).mean()
+
+        hl2 = (high + low) / 2.0
+        upper = hl2 + multiplier * atr
+        lower = hl2 - multiplier * atr
+
+        st = pd.Series(index=close.index, dtype='float64')
+        direction = pd.Series(index=close.index, dtype='int64')
+
+        st.iloc[0] = hl2.iloc[0]
+        direction.iloc[0] = 1
+        for i in range(1, len(close)):
+            prev = st.iloc[i - 1]
+            dir_prev = direction.iloc[i - 1]
+            curr_upper = upper.iloc[i]
+            curr_lower = lower.iloc[i]
+            if dir_prev == 1:
+                st.iloc[i] = min(curr_upper, prev) if close.iloc[i] > prev else curr_upper
+                direction.iloc[i] = 1 if close.iloc[i] > st.iloc[i] else -1
+            else:
+                st.iloc[i] = max(curr_lower, prev) if close.iloc[i] < prev else curr_lower
+                direction.iloc[i] = -1 if close.iloc[i] < st.iloc[i] else 1
+
+        return st.to_numpy(), direction.to_numpy()
 
     def alligator(self, jaw_period: int = 13, jaw_shift: int = 8,
                   teeth_period: int = 8, teeth_shift: int = 5,
                   lips_period: int = 5, lips_shift: int = 3) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Ультра-быстрый расчет Alligator с использованием Numba (без подглядывания в будущее)"""
-        n = len(self.highs)
+        """Alligator без подглядывания в будущее (линии сдвигаем для отрисовки)"""
+        highs = self.data['high'].values.astype(float)
+        lows = self.data['low'].values.astype(float)
+        n = len(highs)
+        median_price = (highs + lows) / 2.0
 
-        # Median price
-        median_price = (self.highs + self.lows) / 2
-
-        # Jaw (синяя линия)
         jaw = vectorized_sma_numba(median_price, jaw_period)
-        jaw_shifted = _shift_with_nan(jaw, jaw_shift)
-
-        # Teeth (красная линия)
         teeth = vectorized_sma_numba(median_price, teeth_period)
-        teeth_shifted = _shift_with_nan(teeth, teeth_shift)
-
-        # Lips (зеленая линия)
         lips = vectorized_sma_numba(median_price, lips_period)
-        lips_shifted = _shift_with_nan(lips, lips_shift)
+
+        # Сдвиги для отрисовки (вперёд по времени на jaw_shift/teeth_shift/lips_shift)
+        jaw_shifted = _shift_with_nan(jaw, -jaw_shift)
+        teeth_shifted = _shift_with_nan(teeth, -teeth_shift)
+        lips_shifted = _shift_with_nan(lips, -lips_shift)
 
         return jaw_shifted, teeth_shifted, lips_shifted
 

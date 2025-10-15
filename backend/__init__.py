@@ -1,64 +1,45 @@
-from backend.bybit_client import (
-    UltraBybitClient,
-    init_bybit_client,
-    close_bybit_client,
-    get_available_symbols,
-    get_market_data,
-    get_ticker_info,
-    get_orderbook,
-    get_multiple_timeframes,
-    get_batch_symbols_data,
-    get_bybit_symbols_sync,
-    get_market_data_sync,
-    get_ticker_info_sync,
-    get_orderbook_sync,
-    klines,
-    ExchangeSource,
-    MarketDataType
+# backend/__init__.py
+"""
+Модуль данных с бирж для анализа сигналов
+"""
+
+from backend.exchange_data import (
+    UltraExchangeDataProvider,
+    Exchange,
+    TimeFrame,
+    TickerData,
+    KlineData,
+    OrderBook,
+    get_data_provider,
+    close_data_provider,
+    get_symbols,
+    get_candles,
+    get_ticker,
+    get_orderbook_data,
+    get_symbols_sync,
+    get_candles_sync,
+    get_ticker_sync,
+    get_available_cryptos,
+    get_available_cryptos_sync
 )
 
 __all__ = [
-    'UltraBybitClient',
-    'init_bybit_client',
-    'close_bybit_client',
-    'get_available_symbols',
-    'get_market_data',
-    'get_ticker_info',
-    'get_orderbook',
-    'get_multiple_timeframes',
-    'get_batch_symbols_data',
-    'get_bybit_symbols_sync',
-    'get_market_data_sync',
-    'get_ticker_info_sync',
-    'get_orderbook_sync',
-    'klines',
-    'ExchangeSource',
-    'MarketDataType'
+    'UltraExchangeDataProvider',
+    'Exchange',
+    'TimeFrame',
+    'TickerData',
+    'KlineData',
+    'OrderBook',
+    'get_data_provider',
+    'close_data_provider',
+    'get_symbols',
+    'get_candles',
+    'get_ticker',
+    'get_orderbook_data',
+    'get_symbols_sync',
+    'get_candles_sync',
+    'get_ticker_sync',
+    'get_available_cryptos',
+    'get_available_cryptos_sync'
 ]
 
-# ---- ВАЖНО: Авто-инициализация только по флагу среды, без блокировки цикла ----
-import os
-import asyncio
-
-async def _auto_init():
-    try:
-        await init_bybit_client()
-        print("✅ Bybit client auto-initialized successfully")
-    except Exception as e:
-        print(f"⚠️  Bybit client auto-init warning: {e}")
-
-def _maybe_autoinit():
-    # По умолчанию ОТКЛЮЧЕНО (без флага — никакого старта в тестах/импортах)
-    if os.getenv("BYBIT_CLIENT_AUTOINIT", "0") != "1":
-        return
-    # Если цикл НЕ запущен — используем безопасный asyncio.run (не блокируем pytest loop)
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        asyncio.run(_auto_init())
-        return
-    # Если цикл уже идёт (например, внутри приложения) — просто создаём задачу
-    loop.create_task(_auto_init())
-
-# Вызов не навредит в тестах, т.к. по умолчанию флаг = 0
-_maybe_autoinit()
